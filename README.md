@@ -22,12 +22,6 @@ Each theorem states the model it holds in (classical or quantum random oracle mo
 
 The specification and the analysis are developed separately. If they disagree, treat that as a bug and report it. Neither document should be read as silently correcting the other.
 
-## No warranty and no liability
-
-These documents are provided "as is", without warranty of any kind, express or implied, including any warranty of correctness, completeness, or fitness for a particular purpose. The authors and contributors accept no responsibility or liability for any loss, damage, or other consequence arising from the use of, or reliance on, these documents or any result in them.
-
-Publishing a proof here is not an endorsement of SHRINCS for any particular use. Anyone deploying SHRINCS is responsible for their own assessment of its security.
-
 ## Reporting errors
 
 Errors in proofs, bounds, or parameters are the most valuable feedback this repository can receive. Please open an issue that names the document, the statement (theorem, lemma, or equation number), and what you believe is wrong. A concrete counterexample or a failing calculation is ideal, but a precise description of a gap is welcome too.
@@ -37,8 +31,6 @@ Issues found with AI assistance are welcome under the same rules as in the [shri
 Documents will be revised as errors are found. Cite a specific version (commit hash or release tag) when referring to a result.
 
 ## License
-
-Copyright © 2026 Blockstream Corporation Inc.
 
 The documents in this repository are licensed under the [Creative Commons Attribution 4.0 International License (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/). The full license text is in [`LICENSE`](./LICENSE).
 
