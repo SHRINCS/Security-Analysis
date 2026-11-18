@@ -8,7 +8,7 @@ Author: Mikhail Kudinov
 >
 > The documents in this repository are research drafts. They have not yet been sufficiently peer reviewed or independently audited, and they may contain errors in statements, proofs, or concrete figures.
 >
-> Nothing here is a guarantee that SHRINCS, or any implementation of it, is secure. Do not rely on these documents as the sole basis for deploying SHRINCS or for protecting funds.
+> Nothing here is a guarantee that SHRINCS, or any implementation of it, is secure. Do not rely on these documents as the sole basis for deploying SHRINCS.
 
 ## Documents
 
