@@ -36,7 +36,7 @@ Work in progress. Each row names the document's result and the Lean declaration 
 | Main, §2–3 | Scheme, Lemma 3.1 (i) (correctness) | `Scheme/Shrincs.lean` (`verify_sign`, `execute_correct`) | done |
 | Main, §4.7 | Theorem 4.2 (FXMSS), Claims 4.1–4.9 reductions | | in progress |
 | Main, §4.8 | Theorem 4.1 (SHRINCS), Claims 4.11–4.16 | | planned |
-| Main, §6 | Concrete bounds | | planned |
+| Main, §6 | Classical figures: Table 5 (122.23 / 122.75 / 121.47 bits), Eqs. (1), (3), (9), Section 6.4 constants, Remark 6.1, Table 8 | `ShrincsSecurity/Concrete/` (kernel-checked evaluation of the paper's sums of Table 6 bounds; SM-DSPR row taken as the paper's conjecture) | done (numerics only; linked to the games once Theorems 4.1–4.2 land) |
 | Undetectability | quantum sm-ud / sm-pre bounds | | planned (VCVio quantum layer) |
 
 ## Assumption ledger
