@@ -34,6 +34,7 @@ Work in progress. Each row names the document's result and the Lean declaration 
 | Main, §4.2–4.5 | Definitions 4.1–4.16 (PRF, SM-TCR, SM-PRE, SM-UD, SM-rTCR, SM-DSPR reused from VCVio with equivalence proofs; SM-TCR-EXCL, S-TCR(Prop), ITSR, collections, EU-CMA games fresh) | `ShrincsSecurity/Notions/` | done |
 | Main, App. C–G | Lemma C.6 (`AvgSearch.succ_le`), Lemma C.7 (`ZeroDist.advantage_le`), Lemma C.9 (`HiddenSlice.abs_game_sub_le`), Theorem E.1 classical (`SmTcrExcl.succ_le`), Corollary G.1 (`RandomSamplingTCR.advantage_le`), Lemma 4.1 (i) (`CollectionLemma.prEvent_game0_collInterface_le`) | `ShrincsSecurity/Notions/Generic/` | done |
 | Main, §2–3 | Scheme, Lemma 3.1 (i) (correctness) | `Scheme/Shrincs.lean` (`verify_sign`, `execute_correct`) | done |
+| Main, §4.3 / App. D.3 | Lemma 4.2, classical (independent functions are harmless), instantiated for Lemma C.9, SM-TCR, Repro, DI-Repro | `gameExt_eq_game_dropExt`, `smtcrGameExt_eq`, `diAdvantageExt_eq` (`Notions/Generic/IndependentFunctions.lean`) | done |
 | Main, §4.7 | Theorem 4.2 (FXMSS), Claims 4.1–4.9 reductions | | in progress |
 | Main, §4.8 | Theorem 4.1 (SHRINCS), Claims 4.11–4.16 | | planned |
 | Main, §6 | Classical figures: Table 5 (122.23 / 122.75 / 121.47 bits), Eqs. (1), (3), (9), Section 6.4 constants, Remark 6.1, Table 8 | `ShrincsSecurity/Concrete/` (kernel-checked evaluation of the paper's sums of Table 6 bounds; SM-DSPR row taken as the paper's conjecture) | done (numerics only; linked to the games once Theorems 4.1–4.2 land) |
