@@ -12,3 +12,5 @@ public import ShrincsSecurity.ITSR.Corollary1
 public import ShrincsSecurity.ITSR.Concrete
 public import ShrincsSecurity.Repro.Simulation
 public import ShrincsSecurity.Repro.PerCall
+public import ShrincsSecurity.ITSR.TheoremF2
+public import ShrincsSecurity.Fxmss.Extraction
