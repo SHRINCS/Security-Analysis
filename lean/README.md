@@ -29,6 +29,7 @@ Work in progress. Each row names the document's result and the Lean declaration 
 | ITSR-Classical | Section 7: Tables 3–5 (exact columns), Table 7 Γ and q₁, Table 6 at SHRINCS-sl | `ITSR/Concrete/` (`decide +kernel` certificates; generator `Concrete/generate.py`) | done |
 | Main, App. F | Theorem F.2, classical part | `advantage_le_theoremF2` (`ITSR/TheoremF2.lean`, from ITSR Theorem 1) | done |
 | Main, §4.7 | Claim 4.10, deterministic core: a fresh verifying forgery contains one of the abort events of F.1–F.9 | `HonestView.extraction`, `claim_4_10` (`Fxmss/Extraction.lean`) | done; needs the digest encoding `yToBytes` injective, which the paper's bit-string digests satisfy |
+| Main, §3.1 | Lemma 3.1 (ii), Lemma 3.2 (`< 2^-994`), `1/p_sum ∈ (65.6, 65.8)` | `prob_grind_fail`, `prob_not_grindComplete_le_epsGc`, `epsGc_shrincs_lt` (`Scheme/Grinding.lean`) | done |
 | Main, App. C | Definitions C.1, C.2; Lemma C.2 (`advantage_le`); Lemma C.4 (`advantage_le_expectedSeedSum`); Lemma C.5 (`experiment_filterRun`); Corollary C.2 (`diAdvantage_le`: `≤ q/|X₁|`, `corollaryC2`) | `ShrincsSecurity/Repro/` | done |
 | Main, §4.2–4.5 | Definitions 4.3–4.16 | `ShrincsSecurity/Notions/` | in progress |
 | Main, App. C–G | Lemmas C.6, C.7, C.9; Theorem E.1; Corollary G.1 | `ShrincsSecurity/Notions/Generic/` | in progress |
