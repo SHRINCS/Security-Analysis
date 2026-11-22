@@ -31,10 +31,10 @@ Work in progress. Each row names the document's result and the Lean declaration 
 | Main, §4.7 | Claim 4.10, deterministic core: a fresh verifying forgery contains one of the abort events of F.1–F.9 | `HonestView.extraction`, `claim_4_10` (`Fxmss/Extraction.lean`) | done; needs the digest encoding `yToBytes` injective, which the paper's bit-string digests satisfy |
 | Main, §3.1 | Lemma 3.1 (ii), Lemma 3.2 (`< 2^-994`), `1/p_sum ∈ (65.6, 65.8)` | `prob_grind_fail`, `prob_not_grindComplete_le_epsGc`, `epsGc_shrincs_lt` (`Scheme/Grinding.lean`) | done |
 | Main, App. C | Definitions C.1, C.2; Lemma C.2 (`advantage_le`); Lemma C.4 (`advantage_le_expectedSeedSum`); Lemma C.5 (`experiment_filterRun`); Corollary C.2 (`diAdvantage_le`: `≤ q/|X₁|`, `corollaryC2`) | `ShrincsSecurity/Repro/` | done |
-| Main, §4.2–4.5 | Definitions 4.3–4.16 | `ShrincsSecurity/Notions/` | in progress |
-| Main, App. C–G | Lemmas C.6, C.7, C.9; Theorem E.1; Corollary G.1 | `ShrincsSecurity/Notions/Generic/` | in progress |
-| Main, §2–3 | Scheme, Lemma 3.1 (i) (correctness) | `Scheme/Shrincs.lean` (`verify_sign`, `execute_correct`) | done; Lemma 3.1 (ii) planned |
-| Main, §4.7 | Theorem 4.2 (FXMSS), Claims 4.1–4.10 | | planned |
+| Main, §4.2–4.5 | Definitions 4.1–4.16 (PRF, SM-TCR, SM-PRE, SM-UD, SM-rTCR, SM-DSPR reused from VCVio with equivalence proofs; SM-TCR-EXCL, S-TCR(Prop), ITSR, collections, EU-CMA games fresh) | `ShrincsSecurity/Notions/` | done |
+| Main, App. C–G | Lemma C.6 (`AvgSearch.succ_le`), Lemma C.7 (`ZeroDist.advantage_le`), Lemma C.9 (`HiddenSlice.abs_game_sub_le`), Theorem E.1 classical (`SmTcrExcl.succ_le`), Corollary G.1 (`RandomSamplingTCR.advantage_le`), Lemma 4.1 (i) (`CollectionLemma.prEvent_game0_collInterface_le`) | `ShrincsSecurity/Notions/Generic/` | done |
+| Main, §2–3 | Scheme, Lemma 3.1 (i) (correctness) | `Scheme/Shrincs.lean` (`verify_sign`, `execute_correct`) | done |
+| Main, §4.7 | Theorem 4.2 (FXMSS), Claims 4.1–4.9 reductions | | in progress |
 | Main, §4.8 | Theorem 4.1 (SHRINCS), Claims 4.11–4.16 | | planned |
 | Main, §6 | Concrete bounds | | planned |
 | Undetectability | quantum sm-ud / sm-pre bounds | | planned (VCVio quantum layer) |
