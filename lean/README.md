@@ -27,7 +27,7 @@ Work in progress. Each row names the document's result and the Lean declaration 
 | ITSR-Classical | Corollary 1 | `advantage_le_onePull` (`ITSR/Corollary1.lean`), `mainBound_eq_onePull` | done |
 | ITSR-Classical | Lemmas 11–13 | `ITSR/Analytic/` | done |
 | ITSR-Classical | Section 7: Tables 3–5 (exact columns), Table 7 Γ and q₁, Table 6 at SHRINCS-sl | `ITSR/Concrete/` (`decide +kernel` certificates; generator `Concrete/generate.py`) | done |
-| Main, App. C | Definitions C.1, C.2; Lemmas C.2, C.4, C.5; Corollary C.2 | `ShrincsSecurity/Repro/` | in progress |
+| Main, App. C | Definitions C.1, C.2; Lemma C.2 (`advantage_le`); Lemma C.4 (`advantage_le_expectedSeedSum`); Lemma C.5 (`experiment_filterRun`); Corollary C.2 (`diAdvantage_le`: `≤ q/|X₁|`, `corollaryC2`) | `ShrincsSecurity/Repro/` | done |
 | Main, §4.2–4.5 | Definitions 4.3–4.16 | `ShrincsSecurity/Notions/` | in progress |
 | Main, App. C–G | Lemmas C.6, C.7, C.9; Theorem E.1; Corollary G.1 | `ShrincsSecurity/Notions/Generic/` | in progress |
 | Main, §2–3 | Scheme, Lemma 3.1 (i) (correctness) | `Scheme/Shrincs.lean` (`verify_sign`, `execute_correct`) | done; Lemma 3.1 (ii) planned |

@@ -10,3 +10,5 @@ public import ShrincsSecurity.ITSR.Theorem1
 public import ShrincsSecurity.ITSR.Theorem2
 public import ShrincsSecurity.ITSR.Corollary1
 public import ShrincsSecurity.ITSR.Concrete
+public import ShrincsSecurity.Repro.Simulation
+public import ShrincsSecurity.Repro.PerCall
