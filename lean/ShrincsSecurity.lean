@@ -18,3 +18,5 @@ public import ShrincsSecurity.Scheme.Grinding
 public import ShrincsSecurity.Notions.All
 public import ShrincsSecurity.Concrete.All
 public import ShrincsSecurity.Notions.Generic.IndependentFunctions
+public import ShrincsSecurity.Fxmss.Theorem42
+public import ShrincsSecurity.Fxmss.Remark46
