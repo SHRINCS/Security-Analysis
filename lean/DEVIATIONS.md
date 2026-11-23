@@ -31,22 +31,22 @@ Each departure is classified as one of:
 
 ## 1. What is proved, and under which hypotheses
 
-| Result | Lean | Hypotheses beyond the document's own |
+| Result | Lean | Hypotheses / scope beyond the document's own |
 |---|---|---|
-| I Theorems 1, 2, Corollary 1 | `ITSR.advantage_le_crudeBound`, `advantage_le_mainBound`, `advantage_le_onePull` | none |
-| I Lemmas 1–13, §7 tables (exact columns) | `ITSR/Coverage*`, `ITSR/Analytic/`, `ITSR/Concrete/` | none |
+| I Theorems 1, 2, Corollary 1 | `ITSR.advantage_le_crudeBound`, `advantage_le_mainBound`, `advantage_le_onePull` | none (§3) |
+| I Lemmas 1–13, §7 tables (exact columns) | `ITSR/Coverage*`, `ITSR/Analytic/`, `ITSR/Concrete/`, `ITSR.Concrete.advantage_le_of_mainBound_le` | one-sided upper bounds only (§3) |
 | M Lemma 3.1 (i) correctness | `Scheme.Shrincs.verify_sign`, `execute_correct` | none (abstract typed model, §4.1) |
-| M Lemma 3.1 (ii), Lemma 3.2 | `Scheme.Grinding.prob_grind_fail`, `epsGc_shrincs_lt` | none |
-| M Definitions 4.1–4.16 | `Notions/` | §4.3 |
-| M Lemmas C.2, C.4, C.5, Corollary C.2 | `Repro.advantage_le`, `advantage_le_expectedSeedSum`, `experiment_filterRun`, `diAdvantage_le`, `corollaryC2` | none |
-| M Lemmas C.6, C.7, C.9, Theorem E.1, Theorem F.2, Corollary G.1, Lemmas 4.1 (i), 4.2 (classical) | `Notions/Generic/`, `ITSR.advantage_le_theoremF2` | none |
+| M Lemma 3.1 (ii), Lemma 3.2 | `Scheme.Grinding.prob_grind_fail`, `prob_execution_fail_le`, `epsGc_shrincs_lt` | Lemma 3.1 (ii) for a fixed call tuple, not bridged to `execute` (§4.1) |
+| M Definitions 4.1–4.16 | `Notions/` | §4.2 |
+| M Lemmas C.2, C.4, C.5, Corollary C.2 | `Repro.advantage_le`, `advantage_le_expectedSeedSum`, `experiment_filterRun`, `diAdvantage_le`, `corollaryC2` | none (§4.3) |
+| M Lemmas C.6, C.7, C.9, Theorem E.1, Theorem F.2, Corollary G.1, Lemmas 4.1 (i), 4.2 (classical) | `Notions/Generic/`, `ITSR.advantage_le_theoremF2` | classical only; Lemma 4.1 (i) and Theorem F.2 scope caveats (§4.3) |
 | M Claim 4.10 | `Fxmss.HonestView.extraction`, `Fxmss.Rom.Honest.claim_4_10` | digest encoding injective (§4.4) |
-| M Theorem 4.2 (classical, ROM for `H_msg^sf`) | `Fxmss.Rom.theorem_4_2`, `corollary_4_2` | Conjecture 3.1 (`GrindComplete`), digest encoding injective |
-| M Theorem 4.1 (classical) | `Shrincs.theorem_4_1` | Conjecture 3.1, digest encoding injective, **Claim 4.16 as `StatelessBound`** (§2) |
-| M §6 classical and quantum figures | `Concrete/`, `Concrete/Quantum/` | the SM-DSPR row is the document's conjecture (§2) |
-| M Lemma C.8 (quantum ZeroDist) | `Undetectability.ZeroDist.Adaptive.advantage_le_of_lossless` | the document's halting assumption (Remark C.1) |
-| M Corollaries C.1, C.3 | `Undetectability.corollaryC1`, `corollaryC3_*` | **Lemma C.3 as hypothesis** (§2) |
-| U Lemmas 1, 2, 3 (endpoint), 7, 8, 11, 13, 14, 15; Theorems 9, 16; Corollary 12 | `Undetectability/` | quantum combs only (§5.1); Corollary 12 takes **Lemma 10 as hypothesis** (§2) |
+| M Theorem 4.2 (classical, ROM for `H_msg^sf`) | `Fxmss.Rom.theorem_4_2`, `theorem_4_2_of_ud_le`, `corollary_4_2` | Conjecture 3.1 (`GrindComplete`), digest encoding injective, `[Nontrivial Msg]`, static `(qh₁, qh₂)` split, no query/time bounds on `B₂–B₈` (§4.5) |
+| M Theorem 4.1 (classical) | `Shrincs.theorem_4_1`, `theorem_4_1_of_ud_le`, `corollary_4_1` | Conjecture 3.1, digest encoding injective, `[Nontrivial Msg]`, static `(qh₁, qh₂)` split, **Stage-2 stateless simulation in `B₂–B₈`** (§4.6), **Claim 4.16 as `StatelessBound`** (§2) |
+| M §6 classical and quantum figures | `Concrete/`, `Concrete/Quantum/` | evaluation of Table 6/7 sums; the SM-DSPR row is the document's conjecture (§2, §4.7) |
+| M Lemma C.8 (quantum ZeroDist) | `Undetectability.ZeroDist.Adaptive.advantage_le_of_lossless` | the document's halting assumption (Remark C.1); stage 2 as effect (§5.2) |
+| M Corollaries C.1, C.3 (arithmetic only) | `Undetectability.ReproHalf.corollaryC1`, `corollaryC3_*` | **pure real-number algebra** over abstract `p₀, p₁ : ℝ` (no quantum Repro/DI-Repro game or quantum Lemma C.5); **Lemma C.3 as hypothesis** (§2, §5.2) |
+| U Lemmas 1, 2, 3 (endpoint), 7, 8, 11, 13, 14, 15; Theorems 9, 16; Corollary 12 | `Undetectability/` (`TwoStageAdversary.smUdAdv_le`, `smUdAdv_le_xor`, `lemma11`, `corollary12`) | quantum combs with static `(q₁, q₂)` split (§5.1); `lemma11` uses bare `hopAccept` rather than a comb (§5.1); Corollary 12 takes full-table **Lemma 10 as hypothesis** (§2, §5.2) |
 
 ---
 
@@ -56,7 +56,7 @@ Each of these is an explicit hypothesis of the theorems that use it.
 
 | Result | What the document says | Lean |
 |---|---|---|
-| M Theorem 4.3 / Claim 4.16 (stateless route of Theorem 4.1) | M p. 49: "We quote that bound, restated under the accounting of Section 4.3; its proof is in [HK22]." Claim 4.16 applies the [HK22] reductions, augmented. | `Shrincs.StatelessBound A εsl`: in the game after the PRF and reprogramming hops (`gameHybS`), a stateless-branch forgery wins with probability `≤ εsl`. It concerns the given forger only. `εsl` stands for the ten [HK22] summands. |
+| M Theorem 4.3 / Claim 4.16 (stateless route of Theorem 4.1) | M p. 49: "We quote that bound, restated under the accounting of Section 4.3; its proof is in [HK22]." Claim 4.16 applies the [HK22] reductions, augmented. | `Shrincs.StatelessBound A εsl`: in the game after the PRF and reprogramming hops (`gameHybS`), a stateless-branch forgery wins with probability `≤ εsl`. `εsl : ℝ≥0∞` is an unconstrained abstract bound (not the ten [HK22] summands in Lean); `H_msg^sl` is deterministic and `A` has unbounded local evaluations of `pr.Th`/`pr.HmsgSl`, so stateless cross-binding (`PK.sf ‖ M`) is not exercised by `theorem_4_1`. |
 | M Lemma C.3 (quantum adaptive reprogramming) | M p. 94: "Adapted from the proof of [LGX25, Theorem 7]". Pp. 95–96 sketch how that external proof is modified; the base proof is not reproduced. | `lemmaC3` hypothesis of `corollaryC1`, `corollaryC3_*` (`Undetectability/Rest/ReproHalf.lean`) |
 | M Lemma C.1 | M p. 94: "Lemma C.1 ([GHHM21])", stated without proof. | hypothesis of `corollaryC3_adv_le_min` |
 | U Lemma 10 (quantum sm-ow) | U p. 13: "We use Lemma 10 as stated in [11] and do not reprove it." | `lemma10` hypothesis of `corollary12` |
@@ -75,7 +75,8 @@ document's `2^-h`; `Concrete.theta_fin_two_pow`).
 - **I §3.1, Definition 4. Choice.** The challenge oracle returns ⊥ after `r` queries; Lean bounds
   the adversary instead (`ITSR.Adversary.chalBound`, an `IsQueryBoundP` on every execution path).
   An adversary that respects the document's oracle makes at most `r` effective challenges, and a
-  bounded adversary never sees ⊥, so the success probabilities coincide.
+  bounded adversary never sees ⊥, so the success probabilities coincide (argued in prose, not proved
+  as a Lean equivalence theorem).
 - **I Lemma 2. Route.** The challenge tape `V` is indexed by fresh challenges rather than by
   challenge number. A run that would exhaust the tape falls back to fresh sampling, and `inv_run`
   proves this never happens for bounded adversaries.
@@ -85,13 +86,21 @@ document's `2^-h`; `Concrete.theta_fin_two_pow`).
 - **I Lemma 6. Route.** It is proved by induction over the adversary program using
   `(c)_m = (c−1)_m + m(c−1)_{m−1}`, not by the union over injective `σ`. The statement (Eq. 9)
   is the same, and uniform in the tapes.
-- **I §7. Route.** `(1−θ)^r` is enclosed by repeated squaring with 2^-256 rounding rather than by
-  the exponential brackets of Lemma 13(ii)/(iii). `R₂` is evaluated directly, because Lemma 11(b)'s
-  hypothesis `η ≤ e^-(k−1)/2` fails at the top rows of Tables 4/5, so Lemma 11(b) cannot be used
-  there. Every exact (“ex”) figure of Tables 3–5 is certified to within 0.01 bits.
-- **I §7. Not certified (scope).** The “up” columns (Lemma 12 upper form) and the derived columns
-  `q×, q₋₁₀, q₋₂₀, x_lin, λ, q_d` of Table 7 and Table 8 are not certified. The maximality of `q*`
-  and `q₁` is not proved; only that the bound is ≤ 1 at a certified `q ≥ 2^(printed − 0.01)`.
+- **I §7. Route and scope.** `(1−θ)^r` is enclosed by repeated squaring with 2^-256 rounding rather
+  than by the exponential brackets of Lemma 13(ii)/(iii). `R₂` is evaluated directly, because Lemma
+  11(b)'s hypothesis `η ≤ e^-(k−1)/2` fails at the top rows of Tables 4/5, so Lemma 11(b) cannot be
+  used there. Every exact (“ex”) figure `v` of Tables 3–5 is certified as a **one-sided upper
+  bound** `term ≤ 2^(v + 0.01)` (no lower bound `2^(v − 0.01) ≤ term` is proved); at `q*` the terms
+  are evaluated at a certified witness `qStar ≥ 2^(printed − 0.01)`. The per-parameter modules
+  bound `ITSR.mainBound` algebraically, and `ITSR.Concrete.advantage_le_of_mainBound_le` bridges
+  any such bound directly to `ITSR.advantage A` (with instances `ShrincsSl.advantage_le_q2e64` and
+  `SLH128s.advantage_le_q2e64`).
+- **I §7. Not certified (scope).** The “up” columns (Lemma 12 upper form), Tables 4–5 `crude`
+  columns, Table 6 (`x_m` and `x_m^{ex}` for all 7 parameter sets; only the bottom SHRINCS-sl
+  `log₂ T_m` row is certified), the derived columns `q_b, q×, q₋₁₀, q₋₂₀, x_lin, λ, q_d` of Table 7
+  and Table 8, Remarks 4–5 numerical values, and §3.4 `OPT` examples are not certified. The
+  maximality of `q*` and `q₁` is not proved; only that the bound is ≤ 1 at a certified
+  `q ≥ 2^(printed − 0.01)`.
 
 ---
 
@@ -118,6 +127,9 @@ document's `2^-h`; `Concrete.theta_fin_two_pow`).
   (`SampleableType`, `VCVio/OracleComp/Constructions/SampleableType/Basic.lean:51`, with
   `SampleableType.finite` at :81), and the typed address record is infinite. Only grinding
   addresses are ever passed to `H_grind`, so nothing is lost.
+- **Lemma 3.1 (ii) execution bound. Scope.** `Scheme.Grinding.prob_execution_fail_le` bounds the
+  failure probability for an arbitrary fixed `L`-tuple of grinding inputs; it is not bridged to
+  `Scheme.Shrincs.execute` (which does not read `H_grind` before forming those inputs).
 
 ### 4.2 Security notions (Definitions 4.1–4.16)
 
@@ -142,16 +154,25 @@ document's `2^-h`; `Concrete.theta_fin_two_pow`).
 - **Definitions 4.15/4.16. Choice (literal reading).** Every queried message enters `{M_i}`,
   including queries answered ⊥ (`FxmssScheme.signOracle`, `Notions/Signature.lean:195–207`). This
   is the literal reading of `M* ∉ {M_i}_{i=1}^{q_s}` (M pp. 46, 51) and the more cautious one. It
-  is what forces §4.5's wrapper budget.
+  is what forces §4.5's wrapper budget. Additionally, `FxmssScheme.sign` returns `Sig` rather than
+  `Option Sig`, so `Fxmss.Rom.Sig` puts `Option` inside the signature pair (`(R, Option ...)`): if
+  grinding ever failed outside Conjecture 3.1, the oracle would return `some (R, none)` rather than
+  `none`; under `GrindComplete` (Theorem 4.2) this branch is unreachable.
 
 ### 4.3 Generic bounds (Appendices C–G)
 
 - **Lemma 4.1 (i). Route; partial scope.** It is proved as
   `Pr[collection game] ≤ Pr[stand-alone game](A′) + 2q/|P|`
-  (`CollectionLemma.prEvent_game0_collInterface_le`), for any property satisfying a stated
-  reservation discipline, with `q` the first-stage evaluations, which is the document's `ξ`. The
-  document's Step 3 is replaced by a second application of Lemma C.9. For advantage notions
-  (SM-UD, SM-DSPR) this route would give `4q/|P|`; those instances are not formalised.
+  (`CollectionLemma.prEvent_game0_collInterface_le`), for any property satisfying `Discipline`,
+  with `q` the first-stage evaluations, which is the document's `ξ`. Two scope limits apply:
+  - The document's Step 3 is replaced by a second application of Lemma C.9, so `standAlone` removes
+    the collection oracle `CollSpec` while **retaining the full collection `P × (T × X) → N` in the
+    direct random oracle `ROSpec`** (rather than reducing to a single member oracle `Th_m` alone).
+  - `Discipline.impl_support` requires challenge refusal to depend only on the challenge state and
+    query before querying the slice, which **excludes `S-TCR(Prop)`** (whose refusal depends on
+    whether the random slice has a valid counter). Only `SM-TCR` is instantiated (`smtcr_discipline`).
+    For advantage notions (SM-UD, SM-DSPR) this route would give `4q/|P|`; those instances are not
+    formalised.
 - **Lemma 4.2. Choice.** Classical only. "Time" is query bounds on the game's oracles. The
   simulated adversary uses only private coins, which are unbounded in every game.
 - **Lemma C.4 / Corollary C.2. Route.** The expectation forms are stated in `ℝ≥0∞` and compared
@@ -160,13 +181,16 @@ document's `2^-h`; `Concrete.theta_fin_two_pow`).
   The part of Lemma C.5 stating that `A′`'s calls have pairwise distinct inputs is not formalised.
 - **Repro, one table. Choice.** The experiment keeps only the table the adversary reads, `O_b`;
   the other table is never observable.
-- **Theorem E.1. Route.** The second game is bounded by a direct per-query argument instead of the
-  reduction to Avg-Search (Algorithm 13). The result is the sharper `(q₂+1)/|N| + q₁/|P|`, which
-  implies the printed bound (`succ_le_of_le`).
+- **Theorem E.1. Route.** Classical only. The second game is bounded by a direct per-query argument
+  instead of the reduction to Avg-Search (Algorithm 13). The result is the sharper
+  `(q₂+1)/|N| + q₁/|P|`, which implies the printed bound for `q₁ ≤ q ∧ q₂ ≤ q` (`succ_le_of_le_each`,
+  `succ_le_of_le`).
 - **Corollary G.1. Route.** It is proved with a potential argument directly, not via Lemma C.4.
-- **Theorem F.2. Scope.** It is stated for an oracle with uniform digests
-  (`ITSR.advantage_le_theoremF2`, derived from I Theorem 1). The document's `MAP ∘ H` is such an
-  oracle when `MAP` has equal-size fibres (M Remark F.1). That step is not formalised.
+- **Theorem F.2. Route and scope.** Classical half only; derived directly from I Theorem 1 rather
+  than via M Appendix F's adaptive-reprogramming proof, and stated for `ITSR.Game` (an oracle with
+  uniform digests, `ITSR.advantage_le_theoremF2`). The document's `MAP ∘ H` (Definition 4.11,
+  `Notions.itsrSucc`) is such an oracle when `MAP` has equal-size fibres (M Remark F.1); that
+  transfer is not formalised.
 
 ### 4.4 Claim 4.10 and the digest encoding
 
@@ -189,9 +213,11 @@ document's `2^-h`; `Concrete.theta_fin_two_pow`).
   - Theorem 4.2 therefore uses `Fxmss.Rom.Honest.claim_4_10` (`Fxmss/Claim410.lean`), where every
     event names a witness computed from the forgery. This is what the document's reductions do
     implicitly, since they output the colliding pair.
-- **Walk up the path. Route.** The document's two minimal indices `t*`, `s` are replaced by one
-  downward induction (`Fxmss.climb_walk`). Claim 4.10 needs no structure-validity hypothesis,
-  because `treeNode` is ⊥ off `A ∪ I`.
+- **Walk up the path. Route.** In `Claim410.lean` (`Honest.claim_4_10`, used by Theorem 4.2), the
+  document's two minimal indices `t*`, `s` are replaced by a single least agreement index `s` found
+  via `Nat.find` (the downward induction `Fxmss.climb_walk` is used only in the unused existential
+  `Extraction.lean`). Claim 4.10 needs no structure-validity hypothesis, because `treeNode` is ⊥
+  off `A ∪ I`.
 
 ### 4.5 Theorem 4.2 (FXMSS)
 
@@ -221,26 +247,42 @@ Departures:
     `{M_i}`, so a forgery on such a message wins for the wrapper and not for `A`, and only
     `Succ(A) ≤ Succ(A′)` survives.
   - The document's `q_s = L` assumes "without loss of generality every query names a leaf of the
-    structure" (M p. 50, Definition 4.16 item 2). For such forgers the total is exactly `L`
-    (`length_wrapIds`).
+    structure" (M p. 50, Definition 4.16 item 2). For such forgers, `length_wrapIds` shows the
+    wrapper adds `min L |unqueried anchors|` completion queries (so total queries equal
+    `|anchors| ≤ L`).
   - The main theorem does not use the wrapper's budget.
-- **Time `ξ`. Choice.** Running time is not modelled. Each term is the advantage of an explicit,
-  named reduction, which is strictly more information than a time bound.
-- **Collection budgets `q_{λ,i}`. Forced (framework).** VCVio's collection games carry no budget:
-  `SM_DT_TCR_Problem` has only `th`, `thColl`, `numTargets`
-  (`VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTTCR.lean:58–64`). Each reduction
-  routes its other evaluations through the collection oracle and respects the tweak reservation;
-  only the count is untracked. Under Conjecture 4.1, which the document's figures use, the count
-  does not matter.
+- **Static per-stage RO split `(qh₁, qh₂)`. Choice (narrower adversary class).** `Forger` bounds
+  Stage 1 (`chooseShape`) at `qh₁` and Stage 2 (`forge`) at `qh₂` separately, whereas the document
+  gives a single total budget `q_h` that an adversary may split dynamically between stages.
+- **Time `ξ`, query bounds, and Stage-2 recomputation on `B₂–B₈`. Scope / modeling gap.**
+  Running time is not modelled, and unlike `B₀`/`B₁`, the collection reductions `B₂–B₈` carry no
+  `IsQueryBoundP` bounds on either challenge or collection queries (only the game's `numTargets`
+  caps plus exact-run proofs against real oracles; VCVio's `SM_DT_*_Problem` carries no collection
+  budget, e.g. `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTTCR.lean:58–64`).
+  Further:
+  - `B₂` and `B₄` make **0** collection queries in Stage 1, deferring `PK.sf` and signing to
+    Stage 2;
+  - `B₂, B₄, B₆, B₇, B₈` discard their Stage-1 oracle answers and recompute all targets in Stage 2;
+    in particular, `B₂` (`Claim43.lean`) calls `noncomputable` unbounded `Notions.leastCounter`
+    (`Nat.find`) in Stage 2 rather than saving `(d_j, c_j)` from `O_Prop` in Stage 1.
+  - Under Conjecture 4.1 collection budgets do not matter, and the reductions are
+    information-theoretically valid, but they do **not** establish the document's concrete Stage-2
+    time accounting `ξ̃ ≤ ξ + V_sf`.
+- **Minor collection-model details. Choice.**
+  - `probGrind`–`probTcrH` (`Fxmss/Members.lean`) pass the full 6-member `pr.collection` to `cons`,
+    yielding 7-member collections in which the attacked member appears twice (harmless).
+  - `thExcl` (`Fxmss/Members.lean`) separates `H` and `Th_lsf` messages via disjoint sum `⊕`
+    without enforcing `P.lsf ≠ 2` in `Params.Valid` (automatic for SHRINCS, where `lsf = 32`).
 - **SM-TCR-EXCL term left as an advantage in `corollary_4_2`. Forced (proof of applicability).**
   Theorem E.1's game has `Th` as a random oracle with no collection oracle; `B8` plays the
   collection game. Lemma 4.1 does not transfer exactly (it has an additive `2q/|P|` loss), so
   substituting E.1 would change the bound.
 - **`PK.sl`. Choice.** It is an arbitrary `slKeygen : PK.seed → ProbComp Y` in Theorem 4.2. The
   document generates it from the stateless key generation, which is an instance.
-- **Finite message type `Msg`. Matches the document.** DI-Repro needs finite `X₁, X₂, Y`
-  (M Definition C.1: "Let X1, X2, and Y be finite sets"), and footnote 16 (M p. 95) states the
-  message set is finite. `idx` is `Fin 256 × Fin 2^64`.
+- **Finite, nontrivial message type `Msg`.** DI-Repro needs finite `X₁, X₂, Y` (M Definition C.1:
+  "Let X1, X2, and Y be finite sets"), and footnote 16 (M p. 95) states the message set is finite.
+  Remark 4.6's completion (`otherMsg`) additionally requires `[Nontrivial Msg]` (`|Msg| ≥ 2`).
+  `idx` is `Fin 256 × Fin 2^64`.
 - **`idx` injectivity. Implicit in the document, made explicit.** `B0`'s distinct tweaks and the
   never-firing guard of `B1` need `idx = toByte(z*,1) ‖ toByte(i*,8)` to be injective on leaves.
   The ranges are stated (M p. 18: `z ≤ h_sf = 255`, "only positions with `i < 2^64` are
@@ -257,11 +299,34 @@ Departures:
   simulates the stateless path itself;
 - `εsl` from `StatelessBound` (§2).
 
+`theorem_4_1_of_ud_le` collapses the `w − 2` SM-UD terms to `w · ε`, and `corollary_4_1` replaces
+`B₀(A_F)` and `B₁⁺` by their classical ROM bounds (`(q_h+2)/|Digest| + (q_h+1)/|Y|` and
+`q_h/|Y|` via `B1S_diAdvantage_le`).
+
 `q₁ = L·l_sf + Σ_{i<d} 2^{h'(d−i)}·l_sl + 2^h·k·2^a`, the exact number of secret elements
 (`cacheAdv_Bprf_bound`). This is at most the document's count.
 
 Departures:
 
+- **Stage-2 stateless simulation in `B₂(A_F)–B₈(A_F)` (Claim 4.15). Major concrete-security gap.**
+  - M Claim 4.15 (p. 65) explicitly notes that simulating the stateless path in Stage 2 of the
+    collection reductions would charge up to `t_sim^{sl} ≤ 2^61` hashes to every collection term,
+    so the paper's augmented reductions build the virtual hypertree in Stage 1 via the collection
+    oracle (using stateless-vs-stateful tweak disjointness).
+  - In Lean, `B₂(A_F)–B₈(A_F)` are simply the §4.7 reductions applied to `AF` (`Wrapper.lean`),
+    which runs `slRootP` (stateless keygen) and `slStepP` (stateless signing) **inside Stage 2**
+    (`forgeExt`), calling `pr.Th` directly (`pubQ`) with 0 stateless collection-oracle queries.
+  - Stateless-vs-stateful tweak disjointness is therefore not exercised in Claims 4.13–4.15 (only
+    in Claim 4.11 for the PRF hop). The reductions are information-theoretically valid, but do
+    **not** preserve Claim 4.15's concrete Stage-2 time bound `ξ̃_sf ≤ ξ + V_sf`.
+- **Scheme-to-game seam, hedged mode, and message encoding. Scope / choice.**
+  - `Shrincs/Model.lean` defines `scheme` directly from the lower-level primitives without proving
+    an equivalence theorem to `Scheme.Shrincs.{keygen, sign, verify}`.
+  - Stateless signing models **hedged mode only** (`optRand ←$ Y`, `Model.lean:211–213`);
+    deterministic mode (`opt_rand = PK.seed`, M fn. 11) is omitted.
+  - `MsgEnc` (`Model.lean:77–83`) imposes no injectivity condition on `m ↦ (ctx m, body m)`, and
+    `roSpec` receives structured `(PK.sl, m)` rather than `boundMessage` bytes.
+  - `Forger` inherits Theorem 4.2's static `(qh₁, qh₂)` stage split and `[Nontrivial Msg]`.
 - **`ε_ds` absent. Forced (framework) / outside the model.**
   - M Assumption 4.1 charges `ε_ds ≤ 2^-n + 10·2^-2n` for SHA-256 calls of two different named
     functions receiving the same input (M Lemma 4.3, p. 43; "charged once in Theorem 4.1, outside
@@ -277,9 +342,8 @@ Departures:
   the itsr notion (Definition 4.11), which is a standard-model notion". In Lean the itsr term is
   inside the quoted `εsl`. Claims 4.11–4.15 hold for an arbitrary `HmsgSl`, and modelling it as an
   oracle would change no bound proved here.
-- **Augmented reductions. Route.** They are the §4.7 reductions run against `A_F`. The shared
-  reprogramming hop uses one new distinguisher `B₁⁺` (Algorithm 5 on the augmented signing phase)
-  covering both branches.
+- **Shared reprogramming distinguisher `B₁⁺`. Route.** `B1S` runs Algorithm 5 on the augmented
+  signing phase covering both branches (`WinNotC1S`).
 - **`PRF_msg` budget `q_s`. Route.** The document evaluates it at `q_s^sl + L`. The Lean games
   have no Remark 4.6 completion before the hop, so `q_s` suffices.
 - **The `B_prf` reduction caches its answers. Forced (proof), and a gap in M's argument.**
@@ -290,7 +354,8 @@ Departures:
   - Every stateless signature reads them again: `signFromPositionWithSecret` (:582) →
     `xmssSignWithSecret` → `intrinsicAuthPathM (xmssLeafWithSecret …)` (:199–207).
   - Addresses are unique per secret element, but the oracle queries repeat. Caching restores
-    distinctness at no cost: `Shrincs.prfAdvantage_cacheAdv` proves the advantage is unchanged.
+    distinctness at no cost: `Shrincs.CachedPRF.prfAdvantage_cacheAdv` proves the advantage is
+    unchanged.
 - **GAME.6. Route.** It is implicit: every forgery is on exactly one branch, so
   `Win = Wsf ∨ Wsl`.
 
@@ -300,9 +365,16 @@ Every figure listed below reproduces: the certified interval contains the printe
 document's rounding rule. Classical: Table 5, Eqs. (1), (3), (9), Section 6.4, Remark 6.1, Table 8.
 Quantum: Table 5, Claims 6.1–6.4, Remark 6.1, the abstract's `2^58.0–2^59.2`.
 
-- **Scope.** These files evaluate the document's sums of generic bounds; they do not restate
-  `InSec ≤ row`. The link to the games exists only where the generic bound is proved: Corollary G.1,
-  Corollary C.2/C.3, E.1, Theorem 16 and Corollary 12 (`smUdQ_theorem16`, `smPreQ_corollary12`).
+- **Scope.** These files evaluate the document's sums of Table 6/7 generic bounds; they do **not**
+  link the composite Theorem 4.1–4.3 sums to `Shrincs.theorem_4_1` or `Fxmss.Rom.theorem_4_2`, nor
+  prove Lemma 5.1 (`Vsf = 497`, `Vsl = 2741` are arithmetic on `Scheme.Params`, not proved to bound
+  `Scheme.Shrincs.verify`'s hash calls). Individual Table 6/7 row bridges exist only for the
+  proved generic bounds:
+  - Classical (`Concrete/Generic.lean`): Corollary G.1 (`smRtcrBound_corollaryG1`), Corollary C.2
+    (`diReproBound_corollaryC2`), Theorem E.1 (`smTcrExclBound_theoremE1`), ITSR Theorem 2
+    (`itsrBound_theorem2`), and classical Theorem F.2 (`itsrBoundF2_theoremF2`).
+  - Quantum (`Concrete/Quantum/Generic.lean`): Theorem 16 (`smUdQ_theorem16`) and Corollary 12
+    (`smPreQ_corollary12`).
 - **Constants. Choice.** `w = 16` and the `2^128`/`2^256` space sizes are literals; verification
   counts and budgets are derived from `Scheme.Params`.
 - **Not certified (scope):**
@@ -321,9 +393,11 @@ Quantum: Table 5, Claims 6.1–6.4, Remark 6.1, the abstract's `2^58.0–2^59.2`
 ### 5.1 Program model
 
 - **Quantum combs, not general adaptive programs. Forced (framework).**
-  - Lemma 1 (the polynomial method) is proved for VCVio `QuantumComb`s: fixed query slots, any
-    trace-nonincreasing instruments between queries, mixed initial state
-    (`QuantumComb.isMarginalLinear_outcome`).
+  - Lemma 1 (the polynomial method) is proved for VCVio `QuantumComb`s (fixed query slots, lossless
+    instruments `lossless_step`/`lossless_final`, mixed initial state;
+    `QuantumComb.isMarginalLinear_outcome`) and for `TwoStageAdversary` (`Marginal/Comb.lean`,
+    which drops losslessness and allows arbitrary trace-nonincreasing steps, with a **static
+    `(q₁, q₂)` stage split** rather than a dynamic `q₁ + q₂ ≤ q` split).
   - VCVio does not prove that a general `QuantumComp` program has an equivalent comb, and its
     design notes show this needs extra hypotheses (`VCVio/docs/design/quantum-layer.md` §1, lines
     75–96: "The converse, that a program has an equivalent comb, is not proved").
@@ -333,22 +407,30 @@ Quantum: Table 5, Claims 6.1–6.4, Remark 6.1, the abstract's `2^58.0–2^59.2`
   (U p. 18). VCVio's oracle unitary needs `[AddCommGroup Y]`
   (`QuantumFoundations/Oracle/Unitary.lean:90`, the section variable before `oracleUnitary` at
   :96). Theorem 16 is therefore proved for finite abelian groups. The SHRINCS instance (XOR,
-  Theorem 9) is abelian (`smUdAdv_le_xor`). A non-abelian version needs a new oracle unitary; the
-  proof (Lemmas 7, 13, 15) does not use commutativity.
+  Theorem 9) is abelian (`TwoStageAdversary.smUdAdv_le_xor`). A non-abelian version needs a new
+  oracle unitary; the proof (Lemmas 7, 13, 15) does not use commutativity.
 - **Challenge answers fixed in a table. Choice that strengthens the result.**
   - In every world the challenge answer on a fresh tweak is fixed before the run (U p. 8: "we may
     therefore sample, before the run, one independent uniform input `x_T`").
   - The Lean adversary is indexed by the whole table `ch : T → N` and may read it in both stages.
     That class contains every Definition 4 adversary, and the bound `4q²/|M|` holds for it.
-  - The embedding of the document's adversaries into this class is argued in the docstrings, not
-    proved in Lean.
-- **Lemma 11's reduction `C`. Choice.** `C` is given by its acceptance probability (run `A`, then
-  classically check `Th(P, T, x*) = ch(T)`), not as a comb with an extra slot. Corollary 12 uses `C`
-  only through Theorem 16, which needs `C`'s `2(q+1)`-point linearity; that is proved directly
-  (`isMarginalLinear_hopAccept`).
+  - No Definition 4 stateful challenge oracle is formalised; the embedding of the document's
+    adversaries into this class is argued in the docstrings, not proved in Lean.
+- **Lemma 11's reduction `C` and Corollary 12. Choice / scope.** `C` is given only by its
+  acceptance function `hopAccept` (run `A`, then classically check `Th(P, T, x*) = ch(T)`), not as
+  a comb with an extra slot; `TwoStageAdversary.lemma11` is therefore `abs_sub_comm` on `rfl`
+  identities, while the nontrivial query-count step is `isMarginalLinear_hopAccept` (`2(q+1)`-point
+  linearity). `TwoStageAdversary.corollary12` takes the quoted `lemma10` hypothesis in this
+  full-table model (and states it for any `[AddCommGroup N]`; `corollary12_xor` specialises to
+  XOR, where [11]'s proof via Lemma 2 applies).
 
 ### 5.2 Individual results
 
+- **M Corollaries C.1 and C.3 (`Undetectability/Rest/ReproHalf.lean`). Scope.** Only the
+  real-number algebraic deductions from Lemma C.3 (and Lemma C.1) are formalised, over abstract
+  reals `p₀, p₁ : ℝ` and arbitrary `qhat : Fin R → ℕ`. Neither the quantum `Repro`/`DI-Repro`
+  experiment, nor quantum Lemma C.5 (`DI-Repro` → `Repro`), nor the query-count verification for
+  `B₁`/`B₄` is formalised.
 - **U Lemma 3 (Markov brothers). Scope.** Only the endpoint form `|P′(±1)| ≤ d²` is proved
   (`abs_derivative_eval_one_le`), from Mathlib's Chebyshev extremality. That is the only use in U
   (p. 9, proof of Lemma 7: "t = −1 gives…"). The full interior inequality is not in Mathlib.
