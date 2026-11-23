@@ -99,19 +99,20 @@ def B2cands (_H : Honest pr) (idf : LeafId) (yf : pr.Digest) (w : Scheme.Fxmss.S
     List (SLHDSA.Adrs × pr.Digest × ℕ) :=
   [((SfAdrs.grindAdrs idf).toAdrs, yf, w.wots.ctr.val)]
 
-/-- The extraction of `B₂`: search the recorded targets for the candidate of the forgery. -/
-noncomputable def B2extract (L : ℕ) {State : Type} (d : Setup pr Msg State) (pk : pr.PkSeed)
+/-- The extraction of `B₂`: search the Stage-1 recorded targets `savedQ` directly for the candidate
+of the forgery (computable; never calls `Notions.leastCounter`). -/
+def B2extract (savedQ : List ((SLHDSA.Adrs × pr.Digest) × (pr.Y × ℕ))) (pk : pr.PkSeed)
     (o : Option (Transcript pr Msg × Honest pr)) : ℕ × pr.Digest × ℕ :=
-  stcrFind ((probGrind pr L).th.eval pk) (B2targets pr Msg L d pk)
-    (forgeryCands pr Msg (B2cands pr) o)
+  stcrFind (fun a mc => pr.Hgrind pk a mc.1 ⟨mc.2 % 2 ^ P.c, Nat.mod_lt _ (Nat.two_pow_pos _)⟩)
+    savedQ (forgeryCands pr Msg (B2cands pr) o)
 
 /-- **The reduction `B₂` of Claim 4.3** (Algorithm 6) against S-TCR(Prop) of `H_grind ∈ Th_λ`
 with `L` targets. -/
 noncomputable def B2 {qs qh₁ qh₂ L : ℕ} (A : Forger pr Msg slKeygen qs qh₁ qh₂ L) :
     Notions.STCRAdversary (probGrind pr L) :=
   mkSTcrAdv (probGrind pr L) (setupHyb pr Msg slKeygen A.toFxmssAdversary) (B2queries pr Msg L)
-    fun d pk => B2extract pr Msg L d pk <$>
-      stageHyb pr Msg slKeygen A.toFxmssAdversary (betaOf pr 0 pk d.u) d pk
+    fun st pk => B2extract pr Msg st.2 pk <$>
+      stageHyb pr Msg slKeygen A.toFxmssAdversary (betaOf pr 0 pk st.1.u) st.1 pk
 
 omit [Fintype pr.Y] [Fintype pr.PkSeed] [Fintype pr.Digest] [DecidableEq pr.Digest] [Fintype Msg]
   [Nontrivial Msg] in
@@ -149,7 +150,8 @@ theorem claim_4_3 (hP : P.Valid) (hgc : GrindComplete pr) {qs qh₁ qh₂ L : �
   rw [B2, mkSTcrAdv_succ (probGrind pr L) _ _ _ (fun d pk => B2targets pr Msg L d pk)
     (fun _ _ => []) fun pk d hd => B2queries_run pr Msg slKeygen A pk d hd]
   refine (prEvent_gameHyb_le pr Msg slKeygen 0 A.toFxmssAdversary Honest.E3
-    (B2extract pr Msg L) (fun d pk out => STCR_IsCollision (probGrind pr L) pk
+    (fun d pk => B2extract pr Msg (B2targets pr Msg L d pk) pk)
+    (fun d pk out => STCR_IsCollision (probGrind pr L) pk
       (B2targets pr Msg L d pk) out = true) ?_).trans le_rfl
   intro pk d hd hS tr w hw hE
   obtain ⟨hid, hne, henc⟩ := hE

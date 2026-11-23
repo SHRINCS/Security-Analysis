@@ -108,11 +108,12 @@ def cands7 (H : Honest pr) (idf : LeafId) (yf : pr.Digest) (w : Fxmss.Sig pr) :
 
 variable [DecidableEq pr.Y]
 
-/-- The output of `B₇` from a run of the rest of `gameHyb 0`. -/
-noncomputable def extract7 {St : Type} (d : Setup pr Msg St) (pk : pr.PkSeed) :
+/-- The output of `B₇` from a run of the rest of `gameHyb 0`, searching the Stage-1 recorded
+targets `savedQ` directly (computable). -/
+def extract7 (savedQ : List (Adrs × (pr.Y × pr.Y))) (pk : pr.PkSeed) :
     Option (Transcript pr Msg × Honest pr) → ℕ × (pr.Y × pr.Y)
   | some (tr, H) => match tr.σf.2 with
-    | some w => tcrFind (fun t (m : pr.Y × pr.Y) => pr.H pk t m.1 m.2) (Q7 pr Msg d pk)
+    | some w => tcrFind (fun t (m : pr.Y × pr.Y) => pr.H pk t m.1 m.2) savedQ
         (cands7 pr H tr.idf tr.yf w)
     | none => (0, default)
   | none => (0, default)
@@ -226,8 +227,8 @@ noncomputable def B7 {qs qh₁ qh₂ L : ℕ} (A : Forger pr Msg slKeygen qs qh�
     SM_DT_TCR_Adversary (probTcrH pr (L - 1)) :=
   mkTcrAdv (probTcrH pr (L - 1)) (setupHyb pr Msg slKeygen A.toFxmssAdversary)
     (fun d => OracleComp.liftComp (prog7 pr Msg d) _)
-    (fun d pk => extract7 pr Msg d pk <$>
-      stageHyb pr Msg slKeygen A.toFxmssAdversary (betaOf pr 0 pk d.u) d pk)
+    (fun st pk => extract7 pr Msg st.2 pk <$>
+      stageHyb pr Msg slKeygen A.toFxmssAdversary (betaOf pr 0 pk st.1.u) st.1 pk)
 
 omit [Fintype pr.Y] [Fintype pr.PkSeed] [Fintype pr.Digest] [DecidableEq pr.Digest]
   [Inhabited pr.Digest] [Fintype Msg] [Nontrivial Msg] in

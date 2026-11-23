@@ -259,18 +259,20 @@ Departures:
 - **Static per-stage RO split `(qh₁, qh₂)`. Choice (narrower adversary class).** `Forger` bounds
   Stage 1 (`chooseShape`) at `qh₁` and Stage 2 (`forge`) at `qh₂` separately, whereas the document
   gives a single total budget `q_h` that an adversary may split dynamically between stages.
-- **Time `ξ`, query bounds, and Stage-2 recomputation on `B₂–B₈`. Scope / modeling gap.**
+- **Time `ξ`, query bounds, and Stage-2 signing simulation on `B₂–B₈`. Scope / modeling gap.**
   Running time is not modelled, and unlike `B₀`/`B₁`, the collection reductions `B₂–B₈` carry no
   `IsQueryBoundP` bounds on either challenge or collection queries (only the game's `numTargets`
   caps plus exact-run proofs against real oracles; VCVio's `SM_DT_*_Problem` carries no collection
   budget, e.g. `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTTCR.lean:58–64`).
   Further:
-  - `B₂` and `B₄` make **0** collection queries in Stage 1, deferring `PK.sf` and signing to
-    Stage 2;
-  - `B₂, B₄, B₆, B₇, B₈` discard their Stage-1 oracle answers and recompute all targets in Stage 2;
-    in particular, `B₂` (`Claim43.lean`) calls `noncomputable` unbounded `Notions.leastCounter`
-    (`Nat.find`) in Stage 2 rather than saving `(d_j, c_j)` from `O_Prop` in Stage 1.
-  - Under Conjecture 4.1 collection budgets do not matter, and the reductions are
+  - `B₂, B₄, B₆, B₇, B₈` record their accepted Stage-1 challenge queries and answers (`recordTcrImpl`,
+    `recordSTcrImpl`, `recordExclImpl`) in Stage 1 and pass `savedQ` to Stage 2, so their Stage-2
+    extractions (`B2extract`, `B4extract`, `B6extract`, `extract7`, `extract9`) are computable and
+    do not recompute targets or call `Notions.leastCounter`;
+  - however, `B₂` and `B₄` make **0** collection queries in Stage 1, and `B₂–B₈` still compute
+    `PK.sf` and FXMSS signing in Stage 2 (`stageHyb`) rather than caching them from Stage-1
+    collection queries;
+  - under Conjecture 4.1 collection budgets do not matter, and the reductions are
     information-theoretically valid, but they do **not** establish the document's concrete Stage-2
     time accounting `ξ̃ ≤ ξ + V_sf`.
 - **Minor collection-model details. Choice.**

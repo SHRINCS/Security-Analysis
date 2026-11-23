@@ -102,18 +102,18 @@ def B6cands (H : Honest pr) (idf : LeafId) (yf : pr.Digest) (w : Scheme.Fxmss.Si
     List (SLHDSA.Adrs × Vector pr.Y P.lsf) :=
   [((SfAdrs.pkAdrs idf).toAdrs, H.fTops idf yf w)]
 
-/-- The extraction of `B₆`. -/
-noncomputable def B6extract {State : Type} (d : Setup pr Msg State) (pk : pr.PkSeed)
+/-- The extraction of `B₆`: search the Stage-1 recorded targets `savedQ` directly (computable). -/
+def B6extract (savedQ : List (SLHDSA.Adrs × Vector pr.Y P.lsf)) (pk : pr.PkSeed)
     (o : Option (Transcript pr Msg × Honest pr)) : ℕ × Vector pr.Y P.lsf :=
-  tcrFind ((thLsf pr).eval pk) (B6targets pr Msg d pk) (forgeryCands pr Msg (B6cands pr) o)
+  tcrFind (pr.ThLsf pk) savedQ (forgeryCands pr Msg (B6cands pr) o)
 
 /-- **The reduction `B₆` of Claim 4.7** (Algorithm 10) against SM-TCR of `Th_lsf ∈ Th_λ` with
 `L` targets. -/
 noncomputable def B6 {qs qh₁ qh₂ L : ℕ} (A : Forger pr Msg slKeygen qs qh₁ qh₂ L) :
     SM_DT_TCR_Adversary (probTcrLsf pr L) :=
   mkTcrAdv (probTcrLsf pr L) (setupHyb pr Msg slKeygen A.toFxmssAdversary) (B6queries pr Msg L)
-    fun d pk => B6extract pr Msg d pk <$>
-      stageHyb pr Msg slKeygen A.toFxmssAdversary (betaOf pr 0 pk d.u) d pk
+    fun st pk => B6extract pr Msg st.2 pk <$>
+      stageHyb pr Msg slKeygen A.toFxmssAdversary (betaOf pr 0 pk st.1.u) st.1 pk
 
 omit [Fintype pr.Y] [DecidableEq pr.Y] [SampleableType pr.Y] [Fintype pr.PkSeed]
   [DecidableEq pr.PkSeed] [Fintype pr.Digest] [DecidableEq pr.Digest] [SampleableType pr.Digest]
@@ -204,7 +204,8 @@ theorem claim_4_7 (hP : P.Valid) (hgc : GrindComplete pr) {qs qh₁ qh₂ L : �
   rw [B6, mkTcrAdv_advantage (probTcrLsf pr L) _ _ _ (fun d pk => B6targets pr Msg d pk)
     (fun d _ => B6collTargets pr Msg d) fun pk d hd => B6queries_run pr Msg slKeygen A pk d hd]
   refine (prEvent_gameHyb_le pr Msg slKeygen 0 A.toFxmssAdversary Honest.E7
-    (B6extract pr Msg) (fun d pk out => tcrWin (probTcrLsf pr L) pk
+    (fun d pk => B6extract pr Msg (B6targets pr Msg d pk) pk)
+    (fun d pk out => tcrWin (probTcrLsf pr L) pk
       (B6targets pr Msg d pk) out = true) ?_).trans le_rfl
   intro pk d hd hS tr w hw hE
   obtain ⟨hid, hne, heq⟩ := hE

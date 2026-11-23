@@ -91,18 +91,18 @@ def B4cands (H : Honest pr) (idf : LeafId) (yf : pr.Digest) (w : Scheme.Fxmss.Si
   (List.finRange P.lsf).flatMap fun ch =>
     (List.range (P.w - 1)).map fun p => (chainTw idf ch.val p, H.fChain idf yf w ch p)
 
-/-- The extraction of `B₄`. -/
-noncomputable def B4extract {State : Type} (d : Setup pr Msg State) (pk : pr.PkSeed)
+/-- The extraction of `B₄`: search the Stage-1 recorded targets `savedQ` directly (computable). -/
+def B4extract (savedQ : List (SLHDSA.Adrs × pr.Y)) (pk : pr.PkSeed)
     (o : Option (Transcript pr Msg × Honest pr)) : ℕ × pr.Y :=
-  tcrFind ((thF pr).eval pk) (B4targets pr Msg d pk) (forgeryCands pr Msg (B4cands pr) o)
+  tcrFind (pr.F pk) savedQ (forgeryCands pr Msg (B4cands pr) o)
 
 /-- **The reduction `B₄` of Claim 4.5** (Algorithm 8) against SM-TCR of `F ∈ Th_λ` with
 `L · lsf · w` targets. -/
 noncomputable def B4 {qs qh₁ qh₂ L : ℕ} (A : Forger pr Msg slKeygen qs qh₁ qh₂ L) :
     SM_DT_TCR_Adversary (probTcrF pr (L * P.lsf * P.w)) :=
   mkTcrAdv (probTcrF pr (L * P.lsf * P.w)) (setupHyb pr Msg slKeygen A.toFxmssAdversary)
-    (B4queries pr Msg L) fun d pk => B4extract pr Msg d pk <$>
-      stageHyb pr Msg slKeygen A.toFxmssAdversary (betaOf pr 0 pk d.u) d pk
+    (B4queries pr Msg L) fun st pk => B4extract pr Msg st.2 pk <$>
+      stageHyb pr Msg slKeygen A.toFxmssAdversary (betaOf pr 0 pk st.1.u) st.1 pk
 
 omit [Fintype pr.Y] [Fintype pr.PkSeed] [Fintype pr.Digest] [DecidableEq pr.Digest] [Fintype Msg]
   [Inhabited pr.Digest] [Nontrivial Msg] in
@@ -160,7 +160,8 @@ theorem claim_4_5 (hP : P.Valid) (hgc : GrindComplete pr) {qs qh₁ qh₂ L : �
     (fun d pk => B4targets pr Msg d pk) (fun _ _ => [])
     fun pk d hd => B4queries_run pr Msg slKeygen A pk d hd]
   refine (prEvent_gameHyb_le pr Msg slKeygen 0 A.toFxmssAdversary Honest.E5
-    (B4extract pr Msg) (fun d pk out => tcrWin (probTcrF pr (L * P.lsf * P.w)) pk
+    (fun d pk => B4extract pr Msg (B4targets pr Msg d pk) pk)
+    (fun d pk out => tcrWin (probTcrF pr (L * P.lsf * P.w)) pk
       (B4targets pr Msg d pk) out = true) ?_).trans le_rfl
   intro pk d hd hS tr w hw hE
   obtain ⟨hid, ch, p, hp, hd1, -, hne, heq⟩ := hE

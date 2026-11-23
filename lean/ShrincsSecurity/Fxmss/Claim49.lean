@@ -118,12 +118,13 @@ def dflt9 : ℕ × Adrs × Msg9 pr := (0, (pkAdrs ⟨0, 0⟩).toAdrs, .inl (defa
 
 variable [DecidableEq pr.Y]
 
-/-- The output of `B₈` from a run of the rest of `gameHyb 0`. -/
-noncomputable def extract9 {St : Type} (d : Setup pr Msg St) (pk : pr.PkSeed) :
+/-- The output of `B₈` from a run of the rest of `gameHyb 0`, searching the Stage-1 recorded
+targets `savedQ` directly (computable). -/
+def extract9 (savedQ : List (Adrs × Msg9 pr)) (pk : pr.PkSeed) :
     Option (Transcript pr Msg × Honest pr) → ℕ × Adrs × Msg9 pr
   | some (tr, H) => match tr.σf.2 with
-    | some w => exclFind ((thExcl pr).eval pk) shrincsX (Q9 pr Msg d pk)
-        (cands9 pr H tr.idf tr.yf w) (dflt9 pr)
+    | some w => exclFind (fun a x => match x with | .inl lr => pr.H pk a lr.1 lr.2 | .inr v => pr.ThLsf pk a v)
+        shrincsX savedQ (cands9 pr H tr.idf tr.yf w) (dflt9 pr)
     | none => dflt9 pr
   | none => dflt9 pr
 
@@ -261,8 +262,8 @@ noncomputable def B8 {qs qh₁ qh₂ L : ℕ} (A : Forger pr Msg slKeygen qs qh�
     SMTCRExclAdversary (probExcl pr (L + (L - 1))) :=
   mkExclAdv (probExcl pr (L + (L - 1))) (setupHyb pr Msg slKeygen A.toFxmssAdversary)
     (fun d => OracleComp.liftComp (prog9 pr Msg d) _)
-    (fun d pk => extract9 pr Msg d pk <$>
-      stageHyb pr Msg slKeygen A.toFxmssAdversary (betaOf pr 0 pk d.u) d pk)
+    (fun st pk => extract9 pr Msg st.2 pk <$>
+      stageHyb pr Msg slKeygen A.toFxmssAdversary (betaOf pr 0 pk st.1.u) st.1 pk)
 
 omit [Fintype pr.Y] [Fintype pr.PkSeed] [Fintype pr.Digest] [DecidableEq pr.Digest]
   [Inhabited pr.Digest] [Fintype Msg] [Nontrivial Msg] in
