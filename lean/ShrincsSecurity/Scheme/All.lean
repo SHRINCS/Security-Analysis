@@ -11,6 +11,7 @@ public import ShrincsSecurity.Scheme.Fxmss
 public import ShrincsSecurity.Scheme.Stateless
 public import ShrincsSecurity.Scheme.Shrincs
 public import ShrincsSecurity.Scheme.Grinding
+public import ShrincsSecurity.Scheme.VerifyCount
 
 /-!
 # The SHRINCS scheme

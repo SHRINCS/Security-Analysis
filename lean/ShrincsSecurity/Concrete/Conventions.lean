@@ -3,6 +3,7 @@ module
 public import ShrincsSecurity.Concrete.Generic
 public import ShrincsSecurity.ITSR.Concrete.ShrincsSl
 public import ShrincsSecurity.Scheme.Params
+public import ShrincsSecurity.Scheme.VerifyCount
 
 /-!
 # The conventions of Section 6.3 and the verification counts of Lemma 5.1
@@ -112,6 +113,43 @@ theorem shrincs_budgets :
     QslLam shrincs = 2 ^ 45 * 164965 ∧ qkg shrincs = 287743 ∧
       shrincs.lsf * shrincs.w + 1 = 513 := by
   decide +kernel
+
+/-! ### Link from Lemma 5.1 counts to the actual verification algorithms -/
+
+theorem chainWorkSl_eq_wotsChainWork (P : Scheme.Params) (C : ℕ) :
+    chainWorkSl P C = VerifyCount.wotsChainWork P C := rfl
+
+theorem smax_eq_wotsSmax (P : Scheme.Params) : smax P = VerifyCount.wotsSmax P := rfl
+
+/-- **Lemma 5.1 (stateful, linked to `Scheme.Fxmss.pkFromSig`)**: `fxmssPkFromSigM` (whose
+deterministic interpretation is `Fxmss.pkFromSig`) makes at most `Vsf P` tweakable-hash calls
+(`497` at SHRINCS parameters), with `V^F ≤ VsfF P` (`240`) and `V^H ≤ VsfH P` (`255`). -/
+theorem Vsf_bounds_fxmssVerify {P : Scheme.Params} (pr : Primitives P) (pk : pr.PkSeed)
+    (md : pr.Digest) (id : LeafId) (σ : Fxmss.Sig pr) :
+    (VerifyCount.fxmssPkFromSigM pr pk md id σ).IsTotalQueryBound (Vsf P) ∧
+    (VerifyCount.fxmssPkFromSigM pr pk md id σ).IsQueryBoundP (VerifyCount.SfVerifyQuery.isF pr)
+      (VsfF P) ∧
+    (VerifyCount.fxmssPkFromSigM pr pk md id σ).IsQueryBoundP (VerifyCount.SfVerifyQuery.isH pr)
+      (VsfH P) :=
+  ⟨VerifyCount.fxmssPkFromSigM_totalBound pr pk md id σ,
+    VerifyCount.fxmssPkFromSigM_fBound pr pk md id σ,
+    VerifyCount.fxmssPkFromSigM_hBound pr pk md id σ⟩
+
+/-- **Lemma 5.1 (stateless, linked to `SLHDSA.GeneralScheme.verifyInternalM`)**: stateless
+verification makes at most `Vsl vp.params` tweakable-hash (`thash`) calls (`2741` at SHRINCS
+parameters) and at most `1 + Vsl vp.params` total public-hash calls (including `H_msg^sl`). -/
+theorem Vsl_bounds_slVerify {vp : ValidatedParams} (pr : Primitives vp.params) [DecidableEq pr.Y]
+    (msg : List SLHDSA.Byte) (sig : Stateless.Sig pr)
+    (pk : SLHDSA.PublicKeyCore pr.toSLHDSA.core) :
+    (SLHDSA.GeneralScheme.verifyInternalM vp.sl pr.toSLHDSA.core msg sig pk :
+      OracleComp (SLHDSA.publicHashSpec pr.toSLHDSA.core) Bool).IsQueryBoundP
+      VerifyCount.isSlThash (Vsl vp.params) ∧
+    OracleComp.IsTotalQueryBound
+      (SLHDSA.GeneralScheme.verifyInternalM vp.sl pr.toSLHDSA.core msg sig pk :
+        OracleComp (SLHDSA.publicHashSpec pr.toSLHDSA.core) Bool)
+      (1 + Vsl vp.params) :=
+  ⟨VerifyCount.verifyInternalM_thashBound pr msg sig pk,
+    VerifyCount.verifyInternalM_isTotalQueryBound_smax pr msg sig pk⟩
 
 /-! ## `Γ` and the pull part at the stateless parameters -/
 

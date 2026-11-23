@@ -43,6 +43,7 @@ Each departure is classified as one of:
 | M Claim 4.10 | `Fxmss.HonestView.extraction`, `Fxmss.Rom.Honest.claim_4_10` | digest encoding injective (§4.4) |
 | M Theorem 4.2 (classical, ROM for `H_msg^sf`) | `Fxmss.Rom.theorem_4_2`, `theorem_4_2_of_ud_le`, `corollary_4_2` | Conjecture 3.1 (`GrindComplete`), digest encoding injective, `[Nontrivial Msg]`, static `(qh₁, qh₂)` split, no query/time bounds on `B₂–B₈` (§4.5) |
 | M Theorem 4.1 (classical) | `Shrincs.theorem_4_1`, `theorem_4_1_of_ud_le`, `corollary_4_1` | Conjecture 3.1, digest encoding injective, `[Nontrivial Msg]`, static `(qh₁, qh₂)` split, **Stage-2 stateless simulation in `B₂–B₈`** (§4.6), **Claim 4.16 as `StatelessBound`** (§2) |
+| M Lemma 5.1 (verification query counts) | `Scheme.VerifyCount.*`, `Concrete.Vsf_bounds_fxmssVerify`, `Concrete.Vsl_bounds_slVerify` | stateful path proved on explicit-query `fxmssPkFromSigM` (`simulateQ_fxmssPkFromSigM = Fxmss.pkFromSig`); stateless path proved on `SLHDSA.GeneralScheme.verifyInternalM` (`shrincs_verify_stateless_eq_simulateQ = Shrincs.verify`) (§4.7) |
 | M §6 classical and quantum figures | `Concrete/`, `Concrete/Quantum/` | evaluation of Table 6/7 sums; the SM-DSPR row is the document's conjecture (§2, §4.7) |
 | M Lemma C.8 (quantum ZeroDist) | `Undetectability.ZeroDist.Adaptive.advantage_le_of_lossless` | the document's halting assumption (Remark C.1); stage 2 as effect (§5.2) |
 | M Corollaries C.1, C.3 (arithmetic only) | `Undetectability.ReproHalf.corollaryC1`, `corollaryC3_*` | **pure real-number algebra** over abstract `p₀, p₁ : ℝ` (no quantum Repro/DI-Repro game or quantum Lemma C.5); **Lemma C.3 as hypothesis** (§2, §5.2) |
@@ -367,11 +368,24 @@ Every figure listed below reproduces: the certified interval contains the printe
 document's rounding rule. Classical: Table 5, Eqs. (1), (3), (9), Section 6.4, Remark 6.1, Table 8.
 Quantum: Table 5, Claims 6.1–6.4, Remark 6.1, the abstract's `2^58.0–2^59.2`.
 
-- **Scope.** These files evaluate the document's sums of Table 6/7 generic bounds; they do **not**
-  link the composite Theorem 4.1–4.3 sums to `Shrincs.theorem_4_1` or `Fxmss.Rom.theorem_4_2`, nor
-  prove Lemma 5.1 (`Vsf = 497`, `Vsl = 2741` are arithmetic on `Scheme.Params`, not proved to bound
-  `Scheme.Shrincs.verify`'s hash calls). Individual Table 6/7 row bridges exist only for the
-  proved generic bounds:
+- **Lemma 5.1 (verification query counts).** Proved directly on the verification algorithms in
+  `Scheme/VerifyCount.lean` and linked to `Concrete/Conventions.lean`:
+  - Stateful path: `fxmssPkFromSigM` is proved equal to `Scheme.Fxmss.pkFromSig` under
+    `simulateQ (sfVerifyImpl pr)` (`simulateQ_fxmssPkFromSigM`), with per-function bounds `1`
+    `H_grind` (`fxmssPkFromSigM_hgrindBound`), `lsf(w − 1) − Swn = 240` `F`
+    (`fxmssPkFromSigM_fBound`), `1` `Th_lsf` (`fxmssPkFromSigM_thLsfBound`), `hsf = 255` `H`
+    (`fxmssPkFromSigM_hBound`), and total `Vsf = 497` (`fxmssPkFromSigM_totalBound`,
+    `Concrete.Vsf_bounds_fxmssVerify`).
+  - Stateless path: `SLHDSA.GeneralScheme.verifyInternalM` is proved equal to `Scheme.Shrincs.verify`
+    on the stateless branch under `|ctx| ≤ 255` (`shrincs_verify_stateless_eq_simulateQ`), with
+    WOTS-TW chain work bounded by `smax = 510` (`sum_complement_chainStepsCore_le_smax`),
+    tweakable-hash queries bounded by `Vsl = 2741` (`verifyInternalM_thashBound`,
+    `Concrete.Vsl_bounds_slVerify`), and total public-hash queries bounded by `1 + Vsl = 2742`
+    (`verifyInternalM_isTotalQueryBound_smax`).
+- **Scope.** The `Concrete/` files evaluate the document's sums of Table 6/7 generic bounds; they
+  do **not** link the composite Theorem 4.1–4.3 sums to `Shrincs.theorem_4_1` or
+  `Fxmss.Rom.theorem_4_2`. Individual Table 6/7 row bridges exist only for the proved generic
+  bounds:
   - Classical (`Concrete/Generic.lean`): Corollary G.1 (`smRtcrBound_corollaryG1`), Corollary C.2
     (`diReproBound_corollaryC2`), Theorem E.1 (`smTcrExclBound_theoremE1`), ITSR Theorem 2
     (`itsrBound_theorem2`), and classical Theorem F.2 (`itsrBoundF2_theoremF2`).
