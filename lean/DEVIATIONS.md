@@ -47,7 +47,7 @@ Each departure is classified as one of:
 | M §6 classical and quantum figures | `Concrete/`, `Concrete/Quantum/` | evaluation of Table 6/7 sums; the SM-DSPR row is the document's conjecture (§2, §4.7) |
 | M Lemma C.8 (quantum ZeroDist) | `Undetectability.ZeroDist.Adaptive.advantage_le_of_lossless` | the document's halting assumption (Remark C.1); stage 2 as effect (§5.2) |
 | M Corollaries C.1, C.3 (arithmetic only) | `Undetectability.ReproHalf.corollaryC1`, `corollaryC3_*` | **pure real-number algebra** over abstract `p₀, p₁ : ℝ` (no quantum Repro/DI-Repro game or quantum Lemma C.5); **Lemma C.3 as hypothesis** (§2, §5.2) |
-| U Lemmas 1, 2, 3 (endpoint), 7, 8, 11, 13, 14, 15; Theorems 9, 16; Corollary 12 | `Undetectability/` (`TwoStageAdversary.smUdAdv_le`, `smUdAdv_le_xor`, `lemma11`, `corollary12`) | quantum combs with static `(q₁, q₂)` split (§5.1); `lemma11` uses bare `hopAccept` rather than a comb (§5.1); Corollary 12 takes full-table **Lemma 10 as hypothesis** (§2, §5.2) |
+| U Lemmas 1, 2, 3 (endpoint), 7, 8, 10, 11, 13, 14, 15; Theorems 9, 16; Corollary 12 | `Undetectability/` (`TwoStageAdversary.smUdAdv_le`, `smUdAdv_le_xor`, `lemma10`, `lemma11`, `corollary12`) | quantum combs with static `(q₁, q₂)` split (§5.1); `lemma11` uses bare `hopAccept` rather than a comb (§5.1); Lemma 10 and Corollary 12 proved unconditionally for any `[AddCommGroup N]` via the polynomial method (§5.1) |
 
 ---
 
@@ -60,7 +60,6 @@ Each of these is an explicit hypothesis of the theorems that use it.
 | M Theorem 4.3 / Claim 4.16 (stateless route of Theorem 4.1) | M p. 49: "We quote that bound, restated under the accounting of Section 4.3; its proof is in [HK22]." Claim 4.16 applies the [HK22] reductions, augmented. | `Shrincs.StatelessBound A εsl`: in the game after the PRF and reprogramming hops (`gameHybS`), a stateless-branch forgery wins with probability `≤ εsl`. `εsl : ℝ≥0∞` is an unconstrained abstract bound (not the ten [HK22] summands in Lean); `H_msg^sl` is deterministic and `A` has unbounded local evaluations of `pr.Th`/`pr.HmsgSl`, so stateless cross-binding (`PK.sf ‖ M`) is not exercised by `theorem_4_1`. |
 | M Lemma C.3 (quantum adaptive reprogramming) | M p. 94: "Adapted from the proof of [LGX25, Theorem 7]". Pp. 95–96 sketch how that external proof is modified; the base proof is not reproduced. | `lemmaC3` hypothesis of `corollaryC1`, `corollaryC3_*` (`Undetectability/Rest/ReproHalf.lean`) |
 | M Lemma C.1 | M p. 94: "Lemma C.1 ([GHHM21])", stated without proof. | hypothesis of `corollaryC3_adv_le_min` |
-| U Lemma 10 (quantum sm-ow) | U p. 13: "We use Lemma 10 as stated in [11] and do not reprove it." | `lemma10` hypothesis of `corollary12` |
 | M Conjecture 3.1 | Stated as a conjecture; Theorems 4.1 and 4.2 assume it. Lemma 3.2 bounds its failure only in the ideal model. | `GrindComplete pr` hypothesis. Lemma 3.2 is proved separately (`epsGc_shrincs_lt : < 2^-994`). |
 | M SM-DSPR row of Table 6 | Conjectured (M p. 77). | `Concrete/`: the stateless and full sums take `dspr` as an argument; the figures use `dsprRow`, and `slSum_le_slBound` holds for any smaller value. |
 | M Conjecture 4.1 (collection oracle harmless) | Conjecture | Not assumed. Collection budgets are not tracked at all (§4.6). |
@@ -448,13 +447,16 @@ Quantum: Table 5, Claims 6.1–6.4, Remark 6.1, the abstract's `2^58.0–2^59.2`
     That class contains every Definition 4 adversary, and the bound `4q²/|M|` holds for it.
   - No Definition 4 stateful challenge oracle is formalised; the embedding of the document's
     adversaries into this class is argued in the docstrings, not proved in Lean.
-- **Lemma 11's reduction `C` and Corollary 12. Choice / scope.** `C` is given only by its
+- **Lemma 10, Lemma 11's reduction `C`, and Corollary 12. Route / choice.** `C` is given only by its
   acceptance function `hopAccept` (run `A`, then classically check `Th(P, T, x*) = ch(T)`), not as
   a comb with an extra slot; `TwoStageAdversary.lemma11` is therefore `abs_sub_comm` on `rfl`
   identities, while the nontrivial query-count step is `isMarginalLinear_hopAccept` (`2(q+1)`-point
-  linearity). `TwoStageAdversary.corollary12` takes the quoted `lemma10` hypothesis in this
-  full-table model (and states it for any `[AddCommGroup N]`; `corollary12_xor` specialises to
-  XOR, where [11]'s proof via Lemma 2 applies).
+  linearity). **U Lemma 10** (`TwoStageAdversary.lemma10`, `smOw_le_of_marginalLinear`, quoted by
+  the paper from [11]) is proved directly in Lean in this full-table model for every `[AddCommGroup N]`
+  via a planted target/non-target product distribution, Lemma 15, the rescaled endpoint Markov bound
+  (`eval_le_two_mul_sq_mul_of_unitInterval`), and the Mean Value Theorem, yielding
+  `A.succOw ≤ 8(q+1)²/|N|`. Consequently `TwoStageAdversary.corollary12`, `corollary12_xor`, and
+  `Concrete.Quantum.smPreQ_corollary12` are completely unconditional (no `lemma10` hypothesis).
 
 ### 5.2 Individual results
 

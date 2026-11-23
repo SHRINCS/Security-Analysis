@@ -23,7 +23,8 @@ of the polynomial method in `ShrincsSecurity.Undetectability.Poly.All`:
 | Theorem 9 | `TwoStageAdversary.smUdAdv_le_xor` | `Theorems/SmUd` |
 | Definitions 5, 6 | `TwoStageAdversary.succPre`, `TwoStageAdversary.succOw` | `Theorems/SmPre` |
 | Lemma 11 | `TwoStageAdversary.lemma11`, `TwoStageAdversary.isMarginalLinear_hopAccept` | `Theorems/SmPre` |
-| Corollary 12 (Lemma 10 as hypothesis) | `TwoStageAdversary.corollary12`, `TwoStageAdversary.corollary12_xor` | `Theorems/SmPre` |
+| Lemma 10 (quantum sm-ow) | `TwoStageAdversary.lemma10`, `smOw_le_of_marginalLinear` | `Theorems/SmPre` |
+| Corollary 12 (unconditional) | `TwoStageAdversary.corollary12`, `TwoStageAdversary.corollary12_xor` | `Theorems/SmPre` |
 
 Program model: VCVio quantum combs (fixed query slots, arbitrary instruments between them, final
 measurement) with the standard oracle `Quantum.oracleUnitary` over an additive commutative group;

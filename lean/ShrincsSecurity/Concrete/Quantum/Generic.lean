@@ -179,12 +179,11 @@ theorem smUdQ_theorem16 [AddGroup M] [Nonempty Pp]
   A.smUdAdv_le
 
 /-- The SM-PRE row of Table 6 is **Corollary 12** of the Undetectability paper
-(`TwoStageAdversary.corollary12`), given Lemma 10 (quoted there from [11]). -/
+(`TwoStageAdversary.corollary12`, unconditional via `TwoStageAdversary.lemma10`). -/
 theorem smPreQ_corollary12 [AddGroup M] [Nonempty Pp]
-    (A : TwoStageAdversary (Pp × T × M) N E (T → N) Pp (T × M) q₁ q₂)
-    (lemma10 : A.succOw ≤ 8 * (((q₁ + q₂ : ℕ) : ℝ) + 1) ^ 2 / Fintype.card N) :
+    (A : TwoStageAdversary (Pp × T × M) N E (T → N) Pp (T × M) q₁ q₂) :
     A.succPre ≤ smPreQ (Fintype.card N) (Fintype.card M) (q₁ + q₂ : ℕ) :=
-  A.corollary12 lemma10
+  A.corollary12
 
 end Undetectability
 

@@ -1,6 +1,8 @@
 module
 
 public import Mathlib.Analysis.SpecialFunctions.Trigonometric.Chebyshev.Extremal
+import Mathlib.Analysis.Calculus.Deriv.MeanValue
+import Mathlib.Analysis.Calculus.Deriv.Polynomial
 
 /-!
 # Markov's inequality at the endpoints
@@ -112,5 +114,57 @@ theorem abs_derivative_eval_one_le_of_unitInterval {d : ℕ} {g : ℝ[X]} (hdeg 
   rw [derivative_rescale_eval] at this
   norm_num at this
   exact this
+
+/-- Rescaling the endpoint Markov bound from `[x, 1] ⊆ [0, 1]` to `[0, 1]`: for `x ∈ [0, 1/2]`,
+a polynomial `g` of degree at most `d` bounded in `[0, 1]` on `[0, 1]` satisfies
+`|g'(x)| ≤ 2 d²`. -/
+theorem abs_derivative_eval_le_two_mul_sq_of_unitInterval {d : ℕ} {g : ℝ[X]}
+    (hdeg : g.natDegree ≤ d) (hbnd : ∀ u ∈ Set.Icc (0 : ℝ) 1, g.eval u ∈ Set.Icc 0 1)
+    {x : ℝ} (hx : x ∈ Set.Icc (0 : ℝ) (1 / 2)) :
+    |(derivative g).eval x| ≤ 2 * (d : ℝ) ^ 2 := by
+  let lin : ℝ[X] := C (1 - x) * X + C x
+  let h : ℝ[X] := g.comp lin
+  have hdeg' : h.natDegree ≤ d := by
+    refine natDegree_comp_le.trans ?_
+    have hlin : lin.natDegree ≤ 1 := natDegree_linear_le
+    calc g.natDegree * lin.natDegree ≤ d * 1 := Nat.mul_le_mul hdeg hlin
+      _ = d := mul_one d
+  have hbnd' : ∀ u ∈ Set.Icc (0 : ℝ) 1, h.eval u ∈ Set.Icc 0 1 := by
+    intro u hu
+    have hval : h.eval u = g.eval ((1 - x) * u + x) := by
+      simp [h, lin, eval_comp]
+    rw [hval]
+    exact hbnd _ ⟨by nlinarith [hx.1, hx.2, hu.1], by nlinarith [hx.1, hx.2, hu.1, hu.2]⟩
+  have h0 := abs_derivative_eval_zero_le_of_unitInterval hdeg' hbnd'
+  have hderiv : (derivative h).eval 0 = (1 - x) * (derivative g).eval x := by
+    simp only [h, lin, derivative_comp, derivative_add, derivative_mul, derivative_C, zero_mul,
+      zero_add, derivative_X, mul_one, add_zero, eval_mul, eval_comp, eval_add, eval_C, eval_X,
+      mul_zero, zero_add]
+  rw [hderiv, abs_mul, abs_of_nonneg (by linarith [hx.2])] at h0
+  have hpos : (1 / 2 : ℝ) ≤ 1 - x := by linarith [hx.2]
+  have h1 : (1 / 2 : ℝ) * |(derivative g).eval x| ≤ (1 - x) * |(derivative g).eval x| :=
+    mul_le_mul_of_nonneg_right hpos (abs_nonneg _)
+  linarith
+
+/-- A polynomial `g` of degree at most `d` bounded in `[0, 1]` on `[0, 1]` with `g(0) = 0`
+satisfies `g(t) ≤ 2 d² t` for every `t ∈ [0, 1/2]` (Mean Value Theorem plus the rescaled
+endpoint Markov bound). -/
+theorem eval_le_two_mul_sq_mul_of_unitInterval {d : ℕ} {g : ℝ[X]} (hdeg : g.natDegree ≤ d)
+    (hbnd : ∀ u ∈ Set.Icc (0 : ℝ) 1, g.eval u ∈ Set.Icc 0 1) (hzero : g.eval 0 = 0)
+    {t : ℝ} (ht : t ∈ Set.Icc (0 : ℝ) (1 / 2)) :
+    g.eval t ≤ 2 * (d : ℝ) ^ 2 * t := by
+  rcases eq_or_lt_of_le ht.1 with rfl | htpos
+  · simp [hzero]
+  have hcont : ContinuousOn (fun u => g.eval u) (Set.Icc 0 t) :=
+    fun u _ => (g.hasDerivAt u).continuousAt.continuousWithinAt
+  have hdiff : ∀ u ∈ Set.Ioo (0 : ℝ) t, HasDerivAt (fun x => g.eval x) ((derivative g).eval u) u :=
+    fun u _ => g.hasDerivAt u
+  obtain ⟨ξ, hξ, hslope⟩ := exists_hasDerivAt_eq_slope (fun u => g.eval u)
+    (fun u => (derivative g).eval u) htpos hcont hdiff
+  rw [hzero, sub_zero, sub_zero, eq_div_iff htpos.ne'] at hslope
+  have hξ_bound := abs_derivative_eval_le_two_mul_sq_of_unitInterval hdeg hbnd
+    ⟨hξ.1.le, hξ.2.le.trans ht.2⟩
+  have hle : (derivative g).eval ξ ≤ 2 * (d : ℝ) ^ 2 := (le_abs_self _).trans hξ_bound
+  nlinarith [htpos]
 
 end ShrincsSecurity.Undetectability
