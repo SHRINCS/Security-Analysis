@@ -30,6 +30,7 @@ Both build with no `sorry`, `axiom` or `native_decide`.
 | J. I Lemma 11(c) `A_m > 0` | **NOT AN ISSUE** | I p. 4: "Throughout the paper k and t are positive integers". I p. 21 uses `t^{-k} > 0`. | — |
 | K. Notes claim the U advantage is signed | **NOTES ARE WRONG** | U p. 8, 12, 13, 18 all print absolute values. Corrections are listed below. | — |
 | Claim 4.10 digits | **HOLDS** | M p. 61; Table 1 p. 6 gives `n = 128 = 32·4 = l_sf·log₂ w`. | `MainPaper.claim410_digits_determine`, `n_eq_lsf_mul_log_w` |
+| L. M §6.4 quantum item 1: verification adds `< 2^-102.3` at ξ = 0 on the stateful path | **IMPRECISION ONLY** (true for the collection summands; the stateful bound at ξ = 0 uses e = 1/2 at the hop, which doubles them) | M p. 79, item 1. | `Concrete.Quantum.section_6_4_quantum_verification`, `section_6_4_quantum_verification_doubled` |
 
 ---
 
@@ -379,3 +380,27 @@ M p. 7: `H_grind : {0,1}^n × T_g × {0,1}^{2n} × {0,1}^c → {0,1}^n`, so `d �
   This is an instance of the general `eq_of_digits_eq`.
 
 **Suggested fix.** None. Optionally add "(`d ∈ {0,1}^n` and `n = l_sf log₂ w`)" after the sentence.
+
+---
+
+## L. Main paper, Section 6.4, quantum item 1: the verification charge at ξ = 0
+
+**Printed text.** M p. 79, "Quantum adversaries", item 1: the quadratic summands "[...] Charged at
+`q := ξ + V` instead of `q := ξ`, they add less than `2^-96.6` on the stateless path and `2^-102.3`
+on the stateful path to the value of the bound at `ξ = 0`." (Same page: "stoped" for "stopped".)
+
+**Verdict: IMPRECISION ONLY.** The figures are correct for the collection summands themselves. But
+at `ξ = 0` the stateful bound's "minimum" column uses the e = 1/2 form at the reprogramming hop,
+which doubles the collection terms (Corollary 4.2). There the verification adds
+`2 · (52513168 − 148)/2^128 ≥ 2^-101.36`, which exceeds the printed `2^-102.3`. No printed table
+entry depends on this sentence.
+
+**Evidence (Lean, `ShrincsSecurity.Concrete.Quantum`).**
+
+* `section_6_4_quantum_verification`: the undoubled increments are `< 2^-96.6` (stateless) and
+  `< 2^-102.3` (stateful).
+* `section_6_4_quantum_verification_doubled`: with e = 1/2 at the hop, the stateful increment of the
+  bound at `ξ = 0` is `> 2^-102.3` (it is `≥ 2^-101.36`).
+
+**Suggested fix.** Say "to the value of these summands at `ξ = 0`", or give `2^-101.3` for the
+stateful bound under e = 1/2.
