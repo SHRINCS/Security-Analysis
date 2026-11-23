@@ -42,7 +42,7 @@ Each departure is classified as one of:
 | M Lemmas C.6, C.7, C.9, Theorem E.1, Theorem F.2, Corollary G.1, Lemmas 4.1 (i), 4.2 (classical) | `Notions/Generic/`, `ITSR.advantage_le_theoremF2` | classical only; Lemma 4.1 (i) and Theorem F.2 scope caveats (§4.3) |
 | M Claim 4.10 | `Fxmss.HonestView.extraction`, `Fxmss.Rom.Honest.claim_4_10` | digest encoding injective (§4.4) |
 | M Theorem 4.2 (classical, ROM for `H_msg^sf`) | `Fxmss.Rom.theorem_4_2`, `theorem_4_2_of_ud_le`, `corollary_4_2` | Conjecture 3.1 (`GrindComplete`), digest encoding injective, `[Nontrivial Msg]`, static `(qh₁, qh₂)` split, no query/time bounds on `B₂–B₈` (§4.5) |
-| M Theorem 4.1 (classical) | `Shrincs.theorem_4_1`, `theorem_4_1_of_ud_le`, `corollary_4_1` | Conjecture 3.1, digest encoding injective, `[Nontrivial Msg]`, static `(qh₁, qh₂)` split, **Stage-2 stateless simulation in `B₂–B₈`** (§4.6), **Claim 4.16 as `StatelessBound`** (§2) |
+| M Theorem 4.1 (classical) | `Shrincs.theorem_4_1`, `theorem_4_1_of_ud_le`, `corollary_4_1` | Conjecture 3.1, digest encoding injective, `[Nontrivial Msg]`, static `(qh₁, qh₂)` split, Stage-1 `O_coll` stateless precomputation in `B2S–B8S` (zero Stage-2 stateless `Th_λ` evaluations; stateful signing still runs in Stage 2, no query/time bounds, §4.6), **Claim 4.16 as `StatelessBound`** (§2) |
 | M Lemma 5.1 (verification query counts) | `Scheme.VerifyCount.*`, `Concrete.Vsf_bounds_fxmssVerify`, `Concrete.Vsl_bounds_slVerify` | stateful path proved on explicit-query `fxmssPkFromSigM` (`simulateQ_fxmssPkFromSigM = Fxmss.pkFromSig`); stateless path proved on `SLHDSA.GeneralScheme.verifyInternalM` (`shrincs_verify_stateless_eq_simulateQ = Shrincs.verify`) (§4.7) |
 | M §6 classical and quantum figures | `Concrete/`, `Concrete/Quantum/` | evaluation of Table 6/7 sums; the SM-DSPR row is the document's conjecture (§2, §4.7) |
 | M Lemma C.8 (quantum ZeroDist) | `Undetectability.ZeroDist.Adaptive.advantage_le_of_lossless` | the document's halting assumption (Remark C.1); stage 2 as effect (§5.2) |
@@ -315,17 +315,28 @@ Departures:
 
 Departures:
 
-- **Stage-2 stateless simulation in `B₂(A_F)–B₈(A_F)` (Claim 4.15). Major concrete-security gap.**
-  - M Claim 4.15 (p. 65) explicitly notes that simulating the stateless path in Stage 2 of the
-    collection reductions would charge up to `t_sim^{sl} ≤ 2^61` hashes to every collection term,
-    so the paper's augmented reductions build the virtual hypertree in Stage 1 via the collection
-    oracle (using stateless-vs-stateful tweak disjointness).
-  - In Lean, `B₂(A_F)–B₈(A_F)` are simply the §4.7 reductions applied to `AF` (`Wrapper.lean`),
-    which runs `slRootP` (stateless keygen) and `slStepP` (stateless signing) **inside Stage 2**
-    (`forgeExt`), calling `pr.Th` directly (`pubQ`) with 0 stateless collection-oracle queries.
-  - Stateless-vs-stateful tweak disjointness is therefore not exercised in Claims 4.13–4.15 (only
-    in Claim 4.11 for the PRF hop). The reductions are information-theoretically valid, but do
-    **not** preserve Claim 4.15's concrete Stage-2 time bound `ξ̃_sf ≤ ξ + V_sf`.
+- **Stage-1 virtual-tree precomputation in `B2S–B8S` (Claim 4.15) and remaining time/budget scope.**
+  - Following M Claim 4.15 (p. 65), `B2S, B3S γ, B4S, B5S, B6S, B7S, B8S` (`Shrincs/Claim415.lean`)
+    do **not** evaluate stateless `Th_λ` hashes in Stage 2. Instead, in Stage 1 each reduction
+    samples all stateless secret leaf values `u_sl ←$ (SlSecAdrs vp → pr.Y)` and calls
+    `slVirtualTreeM` (`Shrincs/VirtualTree.lean`) to compute `PK.sl` and the complete virtual
+    SLH-DSA hypertree lookup table `tbl` via the game's collection oracle `O_coll`
+    (`slVirtualTreeDet_spec`).
+  - This step genuinely exercises stateless-vs-stateful tweak disjointness
+    (`Scheme.not_isStateful_of_isStateless`, `Scheme.SfAdrs.isStateful_toAdrs`, and
+    `isStateful_of_mem_shrincsX_Omega` for `B8S`'s exclusion partition): every stateful challenge
+    query has a stateful tweak, so no Stage-1 stateless collection query is refused and no
+    stateful challenge log changes (`simulateQ_slVirtualTreeM_{stcr,ud,tcr,pre,excl}`).
+  - Stage 2 runs `AFTable` (`tablePubQ` / `slSignTable`), answering every stateless signature from
+    `tbl` and `u_sl` with **zero** stateless `Th_λ` evaluations (`slSignTable_eq_slSignDet`,
+    `stageHyb_AFTable_eq_AFEager`, `gameHyb_AFEager_evalDistEq_gameHyb_AF`,
+    `Claim415.B2S_exp_eq` … `B8S_exp_eq`).
+  - **Remaining scope:** as in §4.5, running time is not modelled, VCVio's collection games carry
+    no `IsQueryBoundP` budgets on collection queries, and stateful signing / `PK.sf` still runs in
+    Stage 2 (`stageHyb`). Thus the reductions mirror Claim 4.15's Stage-1 stateless simulation
+    structure with zero Stage-2 stateless `Th_λ` work, but do **not** formalise concrete time
+    accounting (`ξ̃_sf ≤ ξ + V_sf`). `B₀(A_F)` and `B₁⁺` attack `H_msg^sf` (not `Th_λ`), and
+    Claim 4.16 remains the explicit `StatelessBound` hypothesis (§2).
 - **Hedged mode and message encoding. Scope / choice.**
   - `Shrincs/Model.lean` proves algorithm-by-algorithm correspondence with `Scheme.Shrincs`
     (`keygen_eq_scheme`, `slSign_eq_scheme_sign`, `slVerify_eq_scheme_verify`,

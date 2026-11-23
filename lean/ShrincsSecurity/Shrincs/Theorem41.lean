@@ -46,14 +46,17 @@ queries to `H_msg^sf`, structures with at most `L` anchors) with `StatelessBound
 
 `Succ^{SHRINCS-EU-CMA}(A) ≤ Adv^{prf}_{PRF, q₁}(B_prf) + Adv^{prf}_{PRF_msg, q_s}(B_prfmsg)
   + Adv^{SM-rTCR,1}(B₀(A_F)) + Adv^{DI-Repro}(B₁⁺)
-  + Succ^{S-TCR(Prop)}(B₂(A_F)) + Σ_{γ < w−2} Adv^{sm-ud}(B₃,γ(A_F)) + Succ^{sm-tcr}(B₄(A_F))
-  + Succ^{sm-pre}(B₅(A_F)) + Succ^{sm-tcr}(B₆(A_F)) + Succ^{sm-tcr}(B₇(A_F))
-  + Succ^{sm-tcr-excl}(B₈(A_F)) + ε_sl`.
+  + Succ^{S-TCR(Prop)}(B₂⁺) + Σ_{γ < w−2} Adv^{sm-ud}(B₃,γ⁺) + Succ^{sm-tcr}(B₄⁺)
+  + Succ^{sm-pre}(B₅⁺) + Succ^{sm-tcr}(B₆⁺) + Succ^{sm-tcr}(B₇⁺)
+  + Succ^{sm-tcr-excl}(B₈⁺) + ε_sl`.
 
 `A_F` (`AF`) is the FXMSS forger that runs `A` and simulates the stateless path with uniform
-secrets and randomizers; `B₀(A_F), …, B₈(A_F)` are therefore the **augmented reductions** of
-Section 4.8 (the reductions of Section 4.7 extended by the stateless path), and `B₁⁺` (`B1S`) is
-the augmented `B₁` whose output also covers the stateless branch (one shared reprogramming term).
+secrets and randomizers; `B₀(A_F)` is the augmented `B₀`, `B₁⁺` (`B1S`) is the augmented `B₁`
+whose output also covers the stateless branch (one shared reprogramming term), and `B₂⁺, …, B₈⁺`
+(`B2S, …, B8S`, `Claim415.lean`) are the **Stage-1-precomputing augmented collection reductions**
+of Claim 4.15 (each precomputing `PK.sl` and the full virtual SLH-DSA hypertree via `O_coll` in
+Stage 1 using stateless-vs-stateful tweak disjointness, with zero stateless `Th_λ` evaluations in
+Stage 2).
 
 ## The proof (telescoping, Claims 4.11–4.16)
 
@@ -84,7 +87,9 @@ right-hand side is immediate.
   `PrfMsgBound.lean`) makes at most `q_s` (the completion of Remark 4.6 is not part of
   `GAME.0`–`GAME.2`, so `q_s` and not `q_s^{sl} + L`).
 * **Collection budgets** `q̃_{λ,i}`, `q_λ` are not tracked (the collection games of VCVio carry
-  none), as in Theorem 4.2; the augmented reductions evaluate the stateless path inside `A_F`.
+  none), as in Theorem 4.2; the augmented collection reductions `B2S … B8S` precompute the
+  stateless virtual hypertree in Stage 1 via `O_coll` (`VirtualTree.lean`) and make zero stateless
+  `Th_λ` evaluations in Stage 2 (`AFTable`), while stateful signing still runs in Stage 2.
 * **Finite messages.** The message space is a finite type `Msg` encoding the pairs `(ctx, M)`
   (`MsgEnc`), so that the random oracle's input space is finite (Definition C.2).
 * **`PK.sl` in the FXMSS games** is the constant `slKeygenS`; `A_F` computes the genuine `PK.sl`
@@ -151,8 +156,8 @@ theorem prEvent_winNotC1S_le {qs : ℕ} (A : Notions.ShrincsAdversary (scheme pr
 /-- **Theorem 4.1** (SHRINCS EU-CMA security, classical, `H_msg^sf` a random oracle, under
 Conjecture 3.1 and the quoted stateless route of Claim 4.16): the success of every forger is at
 most the two PRF advantages, the SM-rTCR advantage of `B₀(A_F)`, the DI-Repro advantage of the
-augmented `B₁⁺`, the seven collection terms of Theorem 4.2 for the augmented reductions
-`B₂(A_F), …, B₈(A_F)`, and the stateless bound `ε_sl`. -/
+augmented `B₁⁺`, the seven collection terms of Theorem 4.2 for the Stage-1-precomputing augmented
+reductions `B2S, B3S γ, B4S, B5S, B6S, B7S, B8S`, and the stateless bound `ε_sl`. -/
 theorem theorem_4_1 (hinj : Function.Injective pr.yToBytes) (hgc : GrindComplete pr)
     {qs qh₁ qh₂ L : ℕ} (A : Forger pr Msg enc qs qh₁ qh₂ L) {εsl : ℝ≥0∞}
     (hsl : StatelessBound pr Msg enc A.toShrincsAdversary εsl) :
@@ -163,14 +168,13 @@ theorem theorem_4_1 (hinj : Function.Injective pr.yToBytes) (hgc : GrindComplete
       Notions.Generic.RandomSamplingTCR.advantage (fun _ => true) 1
         (Fxmss.Rom.B0 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
       ENNReal.ofReal (Repro.diAdvantage (B1S pr Msg enc A)) +
-      Notions.STCR_Succ (Fxmss.Rom.B2 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
-      ∑ γ ∈ Finset.range (vp.params.w - 2),
-        SM_DT_UD_Advantage (Fxmss.Rom.B3 pr (BMsg pr Msg) (slKeygenS pr) γ (AF pr Msg enc A)) +
-      SM_DT_TCR_Advantage (Fxmss.Rom.B4 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
-      SM_DT_PRE_Advantage (Fxmss.Rom.B5 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
-      SM_DT_TCR_Advantage (Fxmss.Rom.B6 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
-      SM_DT_TCR_Advantage (Fxmss.Rom.B7 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
-      Notions.SMTCRExcl_Succ (Fxmss.Rom.B8 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
+      Notions.STCR_Succ (B2S pr Msg enc A) +
+      ∑ γ ∈ Finset.range (vp.params.w - 2), SM_DT_UD_Advantage (B3S pr Msg enc γ A) +
+      SM_DT_TCR_Advantage (B4S pr Msg enc A) +
+      SM_DT_PRE_Advantage (B5S pr Msg enc A) +
+      SM_DT_TCR_Advantage (B6S pr Msg enc A) +
+      SM_DT_TCR_Advantage (B7S pr Msg enc A) +
+      Notions.SMTCRExcl_Succ (B8S pr Msg enc A) +
       εsl := by
   rw [prfAdv_BprfAdv, show Notions.prfAdv (Notions.KeyedHash.toPRF (prfMsgF pr))
       (BprfmsgAdv pr Msg enc A.toShrincsAdversary) =
@@ -216,8 +220,7 @@ advantages of the `w − 2` hybrid reductions, the SM-UD term is at most `w · �
 theorem theorem_4_1_of_ud_le (hinj : Function.Injective pr.yToBytes) (hgc : GrindComplete pr)
     {qs qh₁ qh₂ L : ℕ} (A : Forger pr Msg enc qs qh₁ qh₂ L) {εsl ε : ℝ≥0∞}
     (hsl : StatelessBound pr Msg enc A.toShrincsAdversary εsl)
-    (hε : ∀ γ < vp.params.w - 2,
-      SM_DT_UD_Advantage (Fxmss.Rom.B3 pr (BMsg pr Msg) (slKeygenS pr) γ (AF pr Msg enc A)) ≤ ε) :
+    (hε : ∀ γ < vp.params.w - 2, SM_DT_UD_Advantage (B3S pr Msg enc γ A) ≤ ε) :
     succ pr Msg enc A.toShrincsAdversary ≤
       Notions.prfAdv (Notions.KeyedHash.toPRF (prfF pr)) (BprfAdv pr Msg enc A) +
       Notions.prfAdv (Notions.KeyedHash.toPRF (prfMsgF pr))
@@ -225,18 +228,17 @@ theorem theorem_4_1_of_ud_le (hinj : Function.Injective pr.yToBytes) (hgc : Grin
       Notions.Generic.RandomSamplingTCR.advantage (fun _ => true) 1
         (Fxmss.Rom.B0 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
       ENNReal.ofReal (Repro.diAdvantage (B1S pr Msg enc A)) +
-      Notions.STCR_Succ (Fxmss.Rom.B2 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
+      Notions.STCR_Succ (B2S pr Msg enc A) +
       vp.params.w * ε +
-      SM_DT_TCR_Advantage (Fxmss.Rom.B4 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
-      SM_DT_PRE_Advantage (Fxmss.Rom.B5 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
-      SM_DT_TCR_Advantage (Fxmss.Rom.B6 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
-      SM_DT_TCR_Advantage (Fxmss.Rom.B7 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
-      Notions.SMTCRExcl_Succ (Fxmss.Rom.B8 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
+      SM_DT_TCR_Advantage (B4S pr Msg enc A) +
+      SM_DT_PRE_Advantage (B5S pr Msg enc A) +
+      SM_DT_TCR_Advantage (B6S pr Msg enc A) +
+      SM_DT_TCR_Advantage (B7S pr Msg enc A) +
+      Notions.SMTCRExcl_Succ (B8S pr Msg enc A) +
       εsl := by
   refine (theorem_4_1 pr Msg enc hinj hgc A hsl).trans ?_
   gcongr
-  calc ∑ γ ∈ Finset.range (vp.params.w - 2),
-          SM_DT_UD_Advantage (Fxmss.Rom.B3 pr (BMsg pr Msg) (slKeygenS pr) γ (AF pr Msg enc A))
+  calc ∑ γ ∈ Finset.range (vp.params.w - 2), SM_DT_UD_Advantage (B3S pr Msg enc γ A)
       ≤ ∑ _γ ∈ Finset.range (vp.params.w - 2), ε :=
         Finset.sum_le_sum fun γ hγ => hε γ (Finset.mem_range.mp hγ)
     _ = ((vp.params.w - 2 : ℕ) : ℝ≥0∞) * ε := by simp
@@ -255,14 +257,13 @@ theorem corollary_4_1 (hinj : Function.Injective pr.yToBytes) (hgc : GrindComple
       (((qh₁ + qh₂ + 1 : ℕ) : ℝ≥0∞) + 1) / Fintype.card pr.Digest +
         ((qh₁ + qh₂ + 1 : ℕ) : ℝ≥0∞) / Fintype.card pr.Y +
       ((qh₁ + qh₂ : ℕ) : ℝ≥0∞) / Fintype.card pr.Y +
-      Notions.STCR_Succ (Fxmss.Rom.B2 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
-      ∑ γ ∈ Finset.range (vp.params.w - 2),
-        SM_DT_UD_Advantage (Fxmss.Rom.B3 pr (BMsg pr Msg) (slKeygenS pr) γ (AF pr Msg enc A)) +
-      SM_DT_TCR_Advantage (Fxmss.Rom.B4 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
-      SM_DT_PRE_Advantage (Fxmss.Rom.B5 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
-      SM_DT_TCR_Advantage (Fxmss.Rom.B6 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
-      SM_DT_TCR_Advantage (Fxmss.Rom.B7 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
-      Notions.SMTCRExcl_Succ (Fxmss.Rom.B8 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
+      Notions.STCR_Succ (B2S pr Msg enc A) +
+      ∑ γ ∈ Finset.range (vp.params.w - 2), SM_DT_UD_Advantage (B3S pr Msg enc γ A) +
+      SM_DT_TCR_Advantage (B4S pr Msg enc A) +
+      SM_DT_PRE_Advantage (B5S pr Msg enc A) +
+      SM_DT_TCR_Advantage (B6S pr Msg enc A) +
+      SM_DT_TCR_Advantage (B7S pr Msg enc A) +
+      Notions.SMTCRExcl_Succ (B8S pr Msg enc A) +
       εsl := by
   refine (theorem_4_1 pr Msg enc hinj hgc A hsl).trans ?_
   have hr := Notions.Generic.RandomSamplingTCR.advantage_le_of_one (fun _ => true)
