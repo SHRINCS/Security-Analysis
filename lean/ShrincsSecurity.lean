@@ -20,3 +20,6 @@ public import ShrincsSecurity.Concrete.All
 public import ShrincsSecurity.Notions.Generic.IndependentFunctions
 public import ShrincsSecurity.Fxmss.Theorem42
 public import ShrincsSecurity.Fxmss.Remark46
+public import ShrincsSecurity.Undetectability.Poly.All
+public import ShrincsSecurity.Evidence.SmUdHop
+public import ShrincsSecurity.Evidence.MainPaper

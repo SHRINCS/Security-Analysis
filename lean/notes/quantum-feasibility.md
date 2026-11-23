@@ -84,14 +84,14 @@ A final measurement in a general program is an explicit local instrument, e.g. t
 | Lemma 8: zero versus one marked point | **New M + Lemma 1** | Bernoulli function law versus uniform fixed-size subset mixture; repeated-point marginal polynomials; apply Lemma 7 with degree `2q`. |
 | Theorem 9: XOR sm-ud | **New M + Lemmas 1,2,7,8** | Two-stage challenge game, distinct-tweak guard, one-query simulation, endpoint distributional equivalences and total budget preservation. |
 | Lemma 10: sm-ow | **New L** | Average-case quantum Boolean search bound with the stated `8(q+1)²` constant; reduction preserving adaptive challenge semantics and one-query cost via Lemma 2. Compressed-database bounds alone do not establish adversary-output success. |
-| Lemma 11: sm-ud hop | **New S–M; statement caveat** | Transcript-preserving wrapper, final classical verification counted as one query, exact game equalities. The printed equality needs correction/clarification; see below. |
-| Corollary 12: sm-pre | **Direct after prerequisites** | Combine Lemma 10 and the corrected Lemma 11 with Theorem 9 at `q+1`; basic arithmetic. End-to-end inherits their infrastructure. |
+| Lemma 11: sm-ud hop | **New S–M** | Transcript-preserving wrapper, final classical verification counted as one query, exact game equalities. |
+| Corollary 12: sm-pre | **Direct after prerequisites** | Combine Lemma 10 and Lemma 11 with Theorem 9 at `q+1`; basic arithmetic. End-to-end inherits their infrastructure. |
 | Lemma 13: endpoints | **New M** | Uniform random-table planting invariance, shift bijection, independence, and observational equality for adaptive challenge interfaces. |
 | Lemma 14: events on few points | **New S–M** | Deduplicate query points, enumerate consistent assignments, product Bernoulli probabilities, sum polynomial degree bounds. |
 | Lemma 15: degree of planted acceptance | **Direct assembly after Lemmas 1,14 and game definitions** | Fix auxiliary randomness, identify each oracle constraint as a one-bit event, average finite coefficient families independent of λ. |
 | Theorem 16: every-group sm-ud | **Direct after Lemmas 7,13,15; new S–M group generalization** | Existing QROM only covers abelian groups. Literal “every group law” requires generalizing permutation-oracle semantics without retaining false commutativity lemmas. Avoids Lemma 2 entirely. |
 
-**Paper consistency issue:** `Undetectability.txt:706-725` derives `Pr[b=0]=Succ_pre` and `Pr[b=1]=Succ_ow`. Therefore a signed advantage defined as `Pr[b=1]−Pr[b=0]` has the **opposite sign** to the stated Lemma 11 equality. If the intended definition is absolute advantage, equality must instead read `|Succ_pre−Succ_ow|=Adv_ud`. The inequality used for Corollary 12 is valid under the absolute convention. This is a specification issue, not missing Lean infrastructure.
+**Correction:** an earlier version of this note claimed a sign inconsistency in Lemma 11. The rendered PDF (p. 8 and p. 13) prints absolute values in both Definition 4 and Lemma 11; the bars were lost in the text extraction. There is no issue (`paper-issues.md` §A).
 
 ## 5. Main-paper quantum lemmas
 

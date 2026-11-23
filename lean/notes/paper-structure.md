@@ -8,7 +8,7 @@
 - The classical ITSR companion contains a complete, independent proof of the stronger bound quoted as main-paper Theorem F.1. Its hardest adaptive step is Lemma 6, not the final summation.
 - Classical distinct-input reprogramming is particularly valuable: Corollary C.2 gives `q/|X1|`, independent of the number of reprogrammings. Applied to the actual reductions, only the forger’s queries count.
 - A fully proved classical ROM result must distinguish **proved reductions** from **assumptions used to instantiate them**. Collection-oracle equality is conjectured; the proved ideal-model replacement has additive error. The numerical SM-DSPR bound is also conjectured.
-- The undetectability companion is principally quantum and unnecessary for the classical proof. It contains a sign inconsistency in its signed advantage definition and subsequent reductions; do not transcribe it uncritically.
+- The undetectability companion is principally quantum and unnecessary for the classical proof. (An earlier draft of these notes claimed a sign inconsistency in its SM-UD advantage; that was an artifact of the text extraction, which drops the absolute-value bars. The PDF prints `|·|` in Definition 4 and Lemma 11; see `paper-issues.md` §A, §K.)
 - The model idealizes named functions, not their internal SHA-256 implementation. Domain-separation analysis does not establish independent random functions from SHA-256.
 
 ## Source conventions
@@ -168,14 +168,14 @@ The document uses a **single numbering sequence across declaration kinds**.
 | Lemma 1 | 187 | [quantum] | Output probabilities are linear combinations of oracle `2q`-point marginals. |
 | Lemma 2 | 258 | [quantum] | A GF(2)-linear selection oracle can be simulated with one Boolean/vector-oracle query. |
 | Lemma 3 | 384 | [combinatorial/probability-only] | Markov brothers’ inequality: bounded degree-`d` polynomial has derivative at most `d²` on `[-1,1]`. |
-| Definition 4 | 404 | [both] | SM-UD game; printed advantage is signed, unlike main-paper absolute advantage. |
+| Definition 4 | 404 | [both] | SM-UD game; advantage is the absolute difference, as in the main paper (bars lost in the text extraction). |
 | Definition 5 | 417 | [both] | SM-PRE game. |
 | Definition 6 | 429 | [both] | SM-OW replaces hash-generated targets by uniform outputs. |
 | Lemma 7 | 454 | [combinatorial/probability-only] | Binomial planted-family mixture of acceptance degree `d` satisfies `|p1−p0|≤d²/N`. |
 | Lemma 8 | 555 | [quantum] | Distinguish zero Boolean oracle from one uniform marked point with advantage at most `4q_f²/|M|`. |
 | Theorem 9 | 648 | [quantum] | XOR-output SM-UD advantage at most `4q²/|M|`. |
 | Lemma 10 | 678 | [quantum] | Quoted SM-OW bound `8(q+1)²/|N|`. |
-| Lemma 11 | 706 | [both] | SM-PRE/SM-OW difference reduces to SM-UD with one extra verification query; printed sign is inconsistent. |
+| Lemma 11 | 706 | [both] | `|Succ_sm-pre − Succ_sm-ow| = Adv_sm-ud(C)`, with one extra classical verification query. |
 | Corollary 12 | 727 | [quantum] | SM-PRE bound `8(q+1)²/|N| + 4(q+1)²/|M|`. |
 | Lemma 13 | 857 | [both] | Planted-family endpoints reproduce uniform-output and hashed-input SM-UD games. |
 | Lemma 14 | 880 | [combinatorial/probability-only] | Event depending on `t` Bernoulli oracle points has acceptance polynomial degree at most `t`. |
@@ -295,7 +295,7 @@ I.Lemma 13 → certified numerical evaluation
 | U Lemma 1 | External Zhandry result, but a proof is included. |
 | U Lemma 3 | Markov brothers’ inequality **quoted without proof**. |
 | U Lemma 10 | SM-OW bound explicitly **not reproved**. |
-| U Lemmas 2,7,8,11,13–15; Theorems 9,16; Corollary 12 | Proofs supplied, subject to the signed-advantage inconsistency noted below. |
+| U Lemmas 2,7,8,11,13–15; Theorems 9,16; Corollary 12 | Proofs supplied. |
 
 ---
 
@@ -1082,22 +1082,6 @@ Assumption 4.1 treats the collection, both message hashes, PRF and combined PRFm
 Claim 4.12’s ideal randomizer function is consistent on repeats. ITSR challenge keys are fresh iid samples even for repeated messages.
 
 [INFERENCE] The stateless reduction needs an explicit memoization/deduplication simulation for repeated deterministic signing requests, rather than treating a random function as independently resampled on every call. M:3963–3971 explicitly recognizes consistency on repeated inputs.
-
-### Undetectability signed-advantage inconsistency
-
-U Definition 4, lines 413–415, prints
-`Adv = Pr[out=1|b=1] − Pr[out=1|b=0]`
-without absolute values.
-
-But:
-
-- U Theorem 9’s proof identifies it with the reverse Boolean-endpoint difference.
-- U Lemma 11 claims
-  `Succ_sm-pre − Succ_sm-ow = Adv_sm-ud(C)`,
-  while its own endpoint calculation gives the negative of that signed quantity.
-- U Theorem 16’s proof uses `|p1−p0|`.
-
-[INFERENCE] Using the absolute-advantage convention of main Definition 4.6 repairs the needed inequalities; alternatively complement the reduction’s output bit where needed. A faithful formalisation should flag and resolve the convention, not prove the printed false equality.
 
 ### Units
 
