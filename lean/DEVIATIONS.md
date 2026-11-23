@@ -36,7 +36,7 @@ Each departure is classified as one of:
 | I Theorems 1, 2, Corollary 1 | `ITSR.advantage_le_crudeBound`, `advantage_le_mainBound`, `advantage_le_onePull` | none (§3) |
 | I Lemmas 1–13, §7 tables (exact columns) | `ITSR/Coverage*`, `ITSR/Analytic/`, `ITSR/Concrete/`, `ITSR.Concrete.advantage_le_of_mainBound_le` | one-sided upper bounds only (§3) |
 | M Lemma 3.1 (i) correctness | `Scheme.Shrincs.verify_sign`, `execute_correct` | none (abstract typed model, §4.1) |
-| M Lemma 3.1 (ii), Lemma 3.2 | `Scheme.Grinding.prob_grind_fail`, `prob_execution_fail_le`, `epsGc_shrincs_lt` | Lemma 3.1 (ii) for a fixed call tuple, not bridged to `execute` (§4.1) |
+| M Lemma 3.1 (ii), Lemma 3.2 | `Scheme.Grinding.prob_grind_fail`, `Scheme.Shrincs.prob_execute_fail_le`, `Scheme.Grinding.epsGc_shrincs_lt` | none (§4.1) |
 | M Definitions 4.1–4.16 | `Notions/` | §4.2 |
 | M Lemmas C.2, C.4, C.5, Corollary C.2 | `Repro.advantage_le`, `advantage_le_expectedSeedSum`, `experiment_filterRun`, `diAdvantage_le`, `corollaryC2` | none (§4.3) |
 | M Lemmas C.6, C.7, C.9, Theorem E.1, Theorem F.2, Corollary G.1, Lemmas 4.1 (i), 4.2 (classical) | `Notions/Generic/`, `ITSR.advantage_le_theoremF2` | classical only; Lemma 4.1 (i) and Theorem F.2 scope caveats (§4.3) |
@@ -127,9 +127,10 @@ document's `2^-h`; `Concrete.theta_fin_two_pow`).
   (`SampleableType`, `VCVio/OracleComp/Constructions/SampleableType/Basic.lean:51`, with
   `SampleableType.finite` at :81), and the typed address record is infinite. Only grinding
   addresses are ever passed to `H_grind`, so nothing is lost.
-- **Lemma 3.1 (ii) execution bound. Scope.** `Scheme.Grinding.prob_execution_fail_le` bounds the
-  failure probability for an arbitrary fixed `L`-tuple of grinding inputs; it is not bridged to
-  `Scheme.Shrincs.execute` (which does not read `H_grind` before forming those inputs).
+- **Lemma 3.1 (ii) execution bound.** `Scheme.Shrincs.prob_execute_fail_le` bridges
+  `Scheme.Grinding.prob_execution_fail_le` directly to `Scheme.Shrincs.execute` for any valid
+  structure `S`, proving that an honest execution outputs `⊥` on some call with probability at
+  most `|A| · (1 − p_sum)^(2^c)`.
 
 ### 4.2 Security notions (Definitions 4.1–4.16)
 
@@ -319,9 +320,10 @@ Departures:
   - Stateless-vs-stateful tweak disjointness is therefore not exercised in Claims 4.13–4.15 (only
     in Claim 4.11 for the PRF hop). The reductions are information-theoretically valid, but do
     **not** preserve Claim 4.15's concrete Stage-2 time bound `ξ̃_sf ≤ ξ + V_sf`.
-- **Scheme-to-game seam, hedged mode, and message encoding. Scope / choice.**
-  - `Shrincs/Model.lean` defines `scheme` directly from the lower-level primitives without proving
-    an equivalence theorem to `Scheme.Shrincs.{keygen, sign, verify}`.
+- **Hedged mode and message encoding. Scope / choice.**
+  - `Shrincs/Model.lean` proves algorithm-by-algorithm correspondence with `Scheme.Shrincs`
+    (`keygen_eq_scheme`, `slSign_eq_scheme_sign`, `slVerify_eq_scheme_verify`,
+    `verifyWith_eq_scheme_verify`, `signSF_eq_scheme_sign`).
   - Stateless signing models **hedged mode only** (`optRand ←$ Y`, `Model.lean:211–213`);
     deterministic mode (`opt_rand = PK.seed`, M fn. 11) is omitted.
   - `MsgEnc` (`Model.lean:77–83`) imposes no injectivity condition on `m ↦ (ctx m, body m)`, and

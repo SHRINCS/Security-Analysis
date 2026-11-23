@@ -2,6 +2,7 @@ module
 
 public import ShrincsSecurity.Scheme.Fxmss
 public import ShrincsSecurity.Scheme.Stateless
+public import ShrincsSecurity.Scheme.Grinding
 
 /-!
 # The complete SHRINCS scheme
@@ -284,5 +285,214 @@ theorem execute_correct_of_admissible [DecidableEq pr.Y] {desc : Descriptor}
     ∀ p ∈ inputs.zip (execute pr sk st inputs), ∀ σ, p.2 = some σ →
       verify pr p.1.M p.1.ctx σ pk = true :=
   execute_correct (Descriptor.valid hdesc) hk inputs st hctx
+
+/-! ## Lemma 3.1 (ii): signing failure in an honest execution -/
+
+section GrindingFailure
+
+open OracleComp
+open scoped ENNReal
+
+/-- Transport a secret key across replacing `H_grind` (which does not affect key generation). -/
+def SecretKey.withGrind (sk : SecretKey pr)
+    (H : Grinding.GrindInput pr → Fin (2 ^ vp.params.c) → pr.Y) :
+    SecretKey (Grinding.withGrind pr H) :=
+  ⟨sk.skSeed, sk.skPrf, sk.pkSeed, sk.pkSl, sk.sfStructure, sk.pkSf⟩
+
+/-- Transport a public key across replacing `H_grind`. -/
+def PublicKey.withGrind (pk : PublicKey pr)
+    (H : Grinding.GrindInput pr → Fin (2 ^ vp.params.c) → pr.Y) :
+    PublicKey (Grinding.withGrind pr H) :=
+  ⟨pk.pkSeed, pk.pkSl, pk.pkSf⟩
+
+/-- Transport a call input across replacing `H_grind`. -/
+def CallInput.withGrind (c : CallInput pr)
+    (H : Grinding.GrindInput pr → Fin (2 ^ vp.params.c) → pr.Y) :
+    CallInput (Grinding.withGrind pr H) :=
+  ⟨c.M, c.ctx, c.optRand, c.dropState⟩
+
+/-- Replacing `H_grind` does not change Algorithm 1 (`keygen`). -/
+theorem keygen_withGrind (S : Structure) (skSeed : pr.SkSeed) (skPrf : pr.SkPrf)
+    (pkSeed : pr.PkSeed) (H : Grinding.GrindInput pr → Fin (2 ^ vp.params.c) → pr.Y) :
+    keygen (Grinding.withGrind pr H) S skSeed skPrf pkSeed =
+      (keygen pr S skSeed skPrf pkSeed).map fun p => (p.1.withGrind H, p.2.withGrind H) := by
+  simp only [keygen, Option.map_map]
+  rfl
+
+/-- The sequence of `(id, md)` grinding queries issued by an honest execution; it depends only on
+the keys, contexts, messages, and `H_msg^sf`, never on `H_grind`. -/
+def executeGrindCalls (pr : Primitives vp.params) (sk : SecretKey pr) :
+    State → List (CallInput pr) → List (LeafId × pr.Digest)
+  | _, [] => []
+  | st, c :: cs =>
+    if c.ctx.length ≤ 255 then
+      match (if c.dropState then none else st).bind sk.sfStructure.leafSelect with
+      | none => executeGrindCalls pr sk (if c.dropState then none else st) cs
+      | some v =>
+        let id := v.toLeafId vp.params.hsf
+        (id, statefulDigest pr sk id c.ctx c.M) ::
+          executeGrindCalls pr sk ((if c.dropState then none else st).map (· + 1)) cs
+    else executeGrindCalls pr sk (if c.dropState then none else st) cs
+
+/-- Every call in an honest execution uses a remaining stateful leaf, so at most `|A| − q` calls are
+issued from state `some q` (and `0` from `none`). -/
+theorem executeGrindCalls_length_le_rem {sk : SecretKey pr}
+    (hS : sk.sfStructure.Valid vp.params.hsf) :
+    ∀ (inputs : List (CallInput pr)) (st : State),
+      (executeGrindCalls pr sk st inputs).length ≤
+        match st with | none => 0 | some q => sk.sfStructure.anchors.card - q
+  | [], st => by simp [executeGrindCalls]
+  | c :: cs, st => by
+    simp only [executeGrindCalls]
+    set st' := if c.dropState then none else st
+    have hrem : (match st' with | none => 0 | some q => sk.sfStructure.anchors.card - q) ≤
+        match st with | none => 0 | some q => sk.sfStructure.anchors.card - q := by
+      dsimp only [st']
+      cases c.dropState
+      · exact le_rfl
+      · simp
+    by_cases hctx : c.ctx.length ≤ 255
+    · simp only [hctx, ↓reduceIte]
+      cases hsel : st'.bind sk.sfStructure.leafSelect with
+      | none => exact (executeGrindCalls_length_le_rem hS cs st').trans hrem
+      | some v =>
+        cases hst' : st' with
+        | none => simp [hst'] at hsel
+        | some q =>
+          simp only [hst', Option.bind_some] at hsel
+          have hq : q < sk.sfStructure.anchors.card :=
+            (hS.leafSelect_isSome q).1 (by simp [hsel])
+          have ih := executeGrindCalls_length_le_rem hS cs (some (q + 1))
+          rw [hst'] at hrem
+          dsimp only at ih hrem
+          simp only [Option.map_some, List.length_cons]
+          omega
+    · simp only [hctx, ↓reduceIte]
+      exact (executeGrindCalls_length_le_rem hS cs st').trans hrem
+
+/-- An honest execution makes at most `|A|` stateful grinding calls. -/
+theorem executeGrindCalls_length_le {sk : SecretKey pr} (hS : sk.sfStructure.Valid vp.params.hsf)
+    (st : State) (inputs : List (CallInput pr)) :
+    (executeGrindCalls pr sk st inputs).length ≤ sk.sfStructure.anchors.card := by
+  refine (executeGrindCalls_length_le_rem hS inputs st).trans ?_
+  cases st <;> simp
+
+/-- Every grinding call emitted by `executeGrindCalls` has an addressable leaf identifier
+(`z < 256` and `i < 2^64`). -/
+theorem executeGrindCalls_mem_bounds {sk : SecretKey pr} (hS : sk.sfStructure.Valid vp.params.hsf) :
+    ∀ (inputs : List (CallInput pr)) (st : State) {p : LeafId × pr.Digest},
+      p ∈ executeGrindCalls pr sk st inputs → p.1.height < 256 ∧ p.1.index < 2 ^ 64
+  | [], _, _, hp => by simp [executeGrindCalls] at hp
+  | c :: cs, st, p, hp => by
+    simp only [executeGrindCalls] at hp
+    by_cases hctx : c.ctx.length ≤ 255
+    · simp only [hctx, ↓reduceIte] at hp
+      cases hsel : (if c.dropState then none else st).bind sk.sfStructure.leafSelect with
+      | none =>
+        rw [hsel] at hp
+        exact executeGrindCalls_mem_bounds hS cs _ hp
+      | some v =>
+        rw [hsel] at hp
+        simp only [List.mem_cons] at hp
+        rcases hp with rfl | hp
+        · obtain ⟨q, -, hq⟩ := Option.bind_eq_some_iff.1 hsel
+          have hA := hS.leafSelect_mem q v hq
+          have hle := vp.valid.hsf_le
+          exact ⟨by simp [Node.toLeafId]; omega, hS.anchor_idx_lt v hA⟩
+        · exact executeGrindCalls_mem_bounds hS cs _ hp
+    · simp only [hctx, ↓reduceIte] at hp
+      exact executeGrindCalls_mem_bounds hS cs _ hp
+
+/-- Any `⊥` signature in `execute` under `withGrind pr H` comes from a grinding failure on one of
+the `H`-independent inputs in `executeGrindCalls`. -/
+theorem none_mem_execute_withGrind_imp {S : Structure} (hS : S.Valid vp.params.hsf)
+    {skSeed : pr.SkSeed} {skPrf : pr.SkPrf} {pkSeed : pr.PkSeed} {sk : SecretKey pr}
+    {pk : PublicKey pr} (hk : keygen pr S skSeed skPrf pkSeed = some (sk, pk))
+    (H : Grinding.GrindInput pr → Fin (2 ^ vp.params.c) → pr.Y) :
+    ∀ (inputs : List (CallInput pr)) (st : State), (∀ c ∈ inputs, c.ctx.length ≤ 255) →
+      none ∈ execute (Grinding.withGrind pr H) (sk.withGrind H) st
+          (inputs.map fun c => c.withGrind H) →
+      ∃ p ∈ executeGrindCalls pr sk st inputs,
+        WotsC.grind (Grinding.withGrind pr H) sk.pkSeed p.1 p.2 = none
+  | [], _, _, hmem => by simp [execute] at hmem
+  | c :: cs, st, hctx, hmem => by
+    have hk' : keygen (Grinding.withGrind pr H) S skSeed skPrf pkSeed =
+        some (sk.withGrind H, pk.withGrind H) := by
+      rw [keygen_withGrind, hk]; rfl
+    have hc : c.ctx.length ≤ 255 := hctx c (by simp)
+    have hcs : ∀ c' ∈ cs, c'.ctx.length ≤ 255 := fun c' hc' => hctx c' (by simp [hc'])
+    have hSkS : sk.sfStructure = S := (keygen_eq_some hk).2.2.2.2.1
+    simp only [List.map_cons, execute, List.mem_cons] at hmem
+    simp only [executeGrindCalls, hc, ↓reduceIte]
+    set st' := if c.dropState then none else st
+    cases hsel : st'.bind sk.sfStructure.leafSelect with
+    | none =>
+      have hst2 : (sign (Grinding.withGrind pr H) c.M c.ctx (sk.withGrind H) st' c.optRand).2 =
+          st' := sign_state_of_stateless (by simpa [SecretKey.withGrind] using hsel)
+      rcases hmem with hfail | htail
+      · obtain ⟨v, hv, -⟩ := sign_eq_none hS hk' st' c.optRand hc hfail.symm
+        rw [← hSkS, hsel] at hv
+        cases hv
+      · change none ∈ execute (Grinding.withGrind pr H) (sk.withGrind H)
+            (sign (Grinding.withGrind pr H) c.M c.ctx (sk.withGrind H) st' c.optRand).2
+            (cs.map fun c => c.withGrind H) at htail
+        rw [hst2] at htail
+        exact none_mem_execute_withGrind_imp hS hk H cs st' hcs htail
+    | some v =>
+      have hst2 : (sign (Grinding.withGrind pr H) c.M c.ctx (sk.withGrind H) st' c.optRand).2 =
+          st'.map (· + 1) := by
+        simp only [sign, hc, ↓reduceIte, SecretKey.withGrind, hsel]
+      rcases hmem with hfail | htail
+      · obtain ⟨v', hv', hgr⟩ := sign_eq_none hS hk' st' c.optRand hc hfail.symm
+        rw [← hSkS, hsel] at hv'
+        cases hv'
+        exact ⟨(v.toLeafId vp.params.hsf,
+          statefulDigest pr sk (v.toLeafId vp.params.hsf) c.ctx c.M), by simp, hgr⟩
+      · change none ∈ execute (Grinding.withGrind pr H) (sk.withGrind H)
+            (sign (Grinding.withGrind pr H) c.M c.ctx (sk.withGrind H) st' c.optRand).2
+            (cs.map fun c => c.withGrind H) at htail
+        rw [hst2] at htail
+        obtain ⟨p, hp, hgr⟩ := none_mem_execute_withGrind_imp hS hk H cs (st'.map (· + 1)) hcs htail
+        exact ⟨p, List.mem_cons_of_mem _ hp, hgr⟩
+
+/-- **Lemma 3.1 (ii)** for actual honest executions (`execute`): under Assumption 3.1 (an ideal
+random `H_grind`), an honest execution under a valid structure `S` with `L = |A|` anchors outputs
+`⊥` on some signing call with probability at most `|A| · (1 − p_sum)^(2^c)`. -/
+theorem prob_execute_fail_le [Fintype pr.Y] [SampleableType pr.Y]
+    (henc : Grinding.NBitEncoding pr) [Fintype pr.PkSeed] [DecidableEq pr.PkSeed]
+    [Fintype pr.Digest] [DecidableEq pr.Digest]
+    {S : Structure} (hS : S.Valid vp.params.hsf)
+    {skSeed : pr.SkSeed} {skPrf : pr.SkPrf} {pkSeed : pr.PkSeed} {sk : SecretKey pr}
+    {pk : PublicKey pr} (hk : keygen pr S skSeed skPrf pkSeed = some (sk, pk))
+    (st : State) (inputs : List (CallInput pr)) (hctx : ∀ c ∈ inputs, c.ctx.length ≤ 255) :
+    Pr{let H ← $ᵗ (Grinding.GrindInput pr → Fin (2 ^ vp.params.c) → pr.Y)}[
+      none ∈ execute (Grinding.withGrind pr H) (sk.withGrind H) st
+        (inputs.map fun c => c.withGrind H)] ≤
+      (S.anchors.card : ℝ≥0∞) *
+        ENNReal.ofReal ((1 - Grinding.pSum vp.params) ^ 2 ^ vp.params.c) := by
+  have hSkS : sk.sfStructure = S := (keygen_eq_some hk).2.2.2.2.1
+  have hS' : sk.sfStructure.Valid vp.params.hsf := hSkS ▸ hS
+  set calls := executeGrindCalls pr sk st inputs
+  let toInput : Fin calls.length → Grinding.GrindInput pr := fun l =>
+    have hb := executeGrindCalls_mem_bounds hS' inputs st (List.getElem_mem l.isLt)
+    (sk.pkSeed, (⟨(calls[l.val]).1.height, hb.1⟩, ⟨(calls[l.val]).1.index, hb.2⟩), (calls[l.val]).2)
+  have hsub : ∀ H,
+      none ∈ execute (Grinding.withGrind pr H) (sk.withGrind H) st
+        (inputs.map fun c => c.withGrind H) →
+      ∃ l : Fin calls.length,
+        WotsC.grind (Grinding.withGrind pr H) (toInput l).1 (toInput l).2.1.leafId
+          (toInput l).2.2 = none := by
+    intro H hmem
+    obtain ⟨p, hp, hgr⟩ := none_mem_execute_withGrind_imp hS hk H inputs st hctx hmem
+    obtain ⟨i, hi, rfl⟩ := List.mem_iff_getElem.1 hp
+    exact ⟨⟨i, hi⟩, hgr⟩
+  refine (prEvent_mono _ _ _ hsub).trans ?_
+  refine (Grinding.prob_execution_fail_le vp.valid pr henc calls.length toInput).trans ?_
+  have hlen : calls.length ≤ S.anchors.card := by
+    rw [← hSkS]
+    exact executeGrindCalls_length_le hS' st inputs
+  gcongr
+
+end GrindingFailure
 
 end ShrincsSecurity.Scheme.Shrincs

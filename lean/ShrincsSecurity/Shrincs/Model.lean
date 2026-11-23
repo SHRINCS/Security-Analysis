@@ -260,6 +260,108 @@ structure Forger (qs qh₁ qh₂ L : ℕ) extends Notions.ShrincsAdversary (sche
 noncomputable abbrev succ {qs : ℕ} (A : Notions.ShrincsAdversary (scheme pr Msg enc) qs) : ℝ≥0∞ :=
   (scheme pr Msg enc).succ (runtime pr Msg) A
 
+/-! ## Correspondence with `Scheme.Shrincs` (Algorithms 1–3) -/
+
+section SchemeBridge
+
+omit [Fintype pr.Y] [DecidableEq pr.Y] [SampleableType pr.Y] [Inhabited pr.Y]
+  [DecidableEq pr.PkSeed] [SampleableType pr.PkSeed] [SampleableType pr.SkSeed]
+  [SampleableType pr.SkPrf] [DecidableEq pr.Digest] [SampleableType pr.Digest]
+  [DecidableEq Msg] in
+/-- Convert a model secret key to a `Scheme.Shrincs.SecretKey`. -/
+def SK.toSchemeSK (k : SK pr) : Scheme.Shrincs.SecretKey pr :=
+  ⟨k.skSeed, k.skPrf, k.pk, k.pkSl, k.S, k.pkSf⟩
+
+omit [Fintype pr.Y] [DecidableEq pr.Y] [SampleableType pr.Y] [Inhabited pr.Y]
+  [DecidableEq pr.PkSeed] [SampleableType pr.PkSeed] [SampleableType pr.SkSeed]
+  [SampleableType pr.SkPrf] [DecidableEq pr.Digest] [SampleableType pr.Digest]
+  [DecidableEq Msg] in
+/-- Convert a model public key to a `Scheme.Shrincs.PublicKey`. -/
+def PK.toSchemePK (pk : PK pr) : Scheme.Shrincs.PublicKey pr :=
+  ⟨pk.1, pk.2.1, pk.2.2⟩
+
+omit [Fintype pr.Y] [DecidableEq pr.Y] [SampleableType pr.Y]
+  [DecidableEq pr.PkSeed] [SampleableType pr.PkSeed] [SampleableType pr.SkSeed]
+  [SampleableType pr.SkPrf] [DecidableEq pr.Digest] [SampleableType pr.Digest]
+  [DecidableEq Msg] in
+/-- Algorithm 1 (`Scheme.Shrincs.keygen`) on a valid structure produces the exact `(SK, PK)` of
+`Shrincs.Model.keygen`. -/
+theorem keygen_eq_scheme {S : Structure} (hS : S.TreeValid vp.params.hsf) (skSeed : pr.SkSeed)
+    (skPrf : pr.SkPrf) (pkSeed : pr.PkSeed) :
+    let pkSl := Stateless.root pr skSeed pkSeed
+    let pkSf := pkSfOf pr S pkSeed (Scheme.Fxmss.prfSecret pr pkSeed skSeed S)
+    Scheme.Shrincs.keygen pr S skSeed skPrf pkSeed =
+      some (SK.toSchemeSK pr ⟨S, skSeed, skPrf, pkSeed, pkSl, pkSf⟩,
+        PK.toSchemePK pr (pkSeed, pkSl, pkSf)) := by
+  obtain ⟨r, hr⟩ := Option.isSome_iff_exists.1
+    (Scheme.Fxmss.root_isSome hS pkSeed (Scheme.Fxmss.prfSecret pr pkSeed skSeed S))
+  simp [Scheme.Shrincs.keygen, pkSfOf, hr, SK.toSchemeSK, PK.toSchemePK]
+
+omit [Fintype pr.Y] [DecidableEq pr.Y] [SampleableType pr.Y] [Inhabited pr.Y]
+  [DecidableEq pr.PkSeed] [SampleableType pr.PkSeed] [SampleableType pr.SkSeed]
+  [SampleableType pr.SkPrf] [DecidableEq pr.Digest] [SampleableType pr.Digest]
+  [DecidableEq Msg] in
+/-- The model's stateless signer (`slSign`) equals the stateless branch of Algorithm 2
+(`Scheme.Shrincs.sign` at state `⊥`). -/
+theorem slSign_eq_scheme_sign (k : SK pr) (optRand : pr.Y) (msg : Msg) :
+    (Scheme.Shrincs.sign pr (enc.body msg) (enc.ctx msg) (k.toSchemeSK pr) none optRand).1 =
+      some (.stateless (slSign pr Msg enc k optRand msg)) := by
+  simp only [Scheme.Shrincs.sign, enc.ctx_le msg, ↓reduceIte, Option.bind_none,
+    Stateless.sign, SLHDSA.External.signPureWithRandomizer,
+    SLHDSA.External.encodePureMessage_eq_ok _ _ (enc.ctx_le msg)]
+  rfl
+
+omit [Fintype pr.Y] [SampleableType pr.Y] [Inhabited pr.Y]
+  [DecidableEq pr.PkSeed] [SampleableType pr.PkSeed] [SampleableType pr.SkSeed]
+  [SampleableType pr.SkPrf] [DecidableEq pr.Digest] [SampleableType pr.Digest]
+  [DecidableEq Msg] in
+/-- The model's stateless verifier (`slVerify`) is definitionally the stateless branch of
+Algorithm 3 (`Scheme.Shrincs.verify`). -/
+theorem slVerify_eq_scheme_verify (pk : PK pr) (msg : Msg) (σ' : Stateless.Sig pr) :
+    slVerify pr Msg enc pk.1 pk.2.1 pk.2.2 msg σ' =
+      Scheme.Shrincs.verify pr (enc.body msg) (enc.ctx msg) (.stateless σ') (PK.toSchemePK pr pk) :=
+  rfl
+
+omit [Fintype pr.Y] [SampleableType pr.Y] [Inhabited pr.Y]
+  [DecidableEq pr.PkSeed] [SampleableType pr.PkSeed] [SampleableType pr.SkSeed]
+  [SampleableType pr.SkPrf] [DecidableEq pr.Digest] [SampleableType pr.Digest]
+  [DecidableEq Msg] in
+/-- When the random oracle returns `H_msg^sf(R, PK.seed, PK.sf, (z, i), M̃)`, the model's stateful
+verifier (`verifyWith`) equals the stateful branch of Algorithm 3 (`Scheme.Shrincs.verify`). -/
+theorem verifyWith_eq_scheme_verify (pk : PK pr) (msg : Msg) (z i : ℕ) (R : pr.Y)
+    (σt : Scheme.Fxmss.Sig pr) :
+    verifyWith pr pk.1 pk.2.2 ⟨z, i⟩ (some σt)
+        (pr.HmsgSf R pk.1 pk.2.2 ⟨z, i⟩ (bmBytes pr Msg enc pk.2.1 msg)) =
+      Scheme.Shrincs.verify pr (enc.body msg) (enc.ctx msg) (.stateful z i R σt)
+        (PK.toSchemePK pr pk) := by
+  unfold Scheme.Shrincs.verify Scheme.Fxmss.verifyMessage verifyWith bmBytes PK.toSchemePK
+  simp only [enc.ctx_le msg, decide_true, Bool.true_and]
+  rw [Bool.eq_iff_iff, decide_eq_true_eq]
+  cases Scheme.Fxmss.pkFromSig pr pk.1
+    (pr.HmsgSf R pk.1 pk.2.2 ⟨z, i⟩
+      (Scheme.Shrincs.boundMessage pr (enc.ctx msg) pk.2.1 (enc.body msg)))
+    ⟨z, i⟩ σt <;> simp
+
+omit [Fintype pr.Y] [DecidableEq pr.Y] [SampleableType pr.Y] [Inhabited pr.Y]
+  [DecidableEq pr.PkSeed] [SampleableType pr.PkSeed] [SampleableType pr.SkSeed]
+  [SampleableType pr.SkPrf] [DecidableEq pr.Digest] [SampleableType pr.Digest]
+  [DecidableEq Msg] in
+/-- When `leafSelect ctr = some v` and the random oracle returns `H_msg^sf`, the stateful branch of
+`signSF` produces the exact signature of Algorithm 2 (`Scheme.Shrincs.sign`). -/
+theorem signSF_eq_scheme_sign (k : SK pr) (ctr : ℕ) {v : Node}
+    (hv : k.S.leafSelect ctr = some v) (optRand : pr.Y) (msg : Msg) :
+    let id := v.toLeafId vp.params.hsf
+    let R := pr.PRFmsgSf k.skPrf k.pk id (bmBytes pr Msg enc k.pkSl msg)
+    let md := pr.HmsgSf R k.pk k.pkSf id (bmBytes pr Msg enc k.pkSl msg)
+    (Scheme.Fxmss.sign pr k.S k.pk (k.wots pr) md id).map
+        (Scheme.Shrincs.Signature.stateful id.height id.index R) =
+      (Scheme.Shrincs.sign pr (enc.body msg) (enc.ctx msg) (k.toSchemeSK pr) (some ctr) optRand).1 := by
+  simp only [Scheme.Shrincs.sign, enc.ctx_le msg, ↓reduceIte, SK.toSchemeSK, Option.bind_some, hv,
+    Scheme.Fxmss.signMessage, Scheme.Shrincs.statefulRandomizer, bmBytes, SK.wots,
+    Scheme.Shrincs.SecretKey.wotsSecret]
+
+end SchemeBridge
+
 end ShrincsSecurity.Shrincs
 
 end
