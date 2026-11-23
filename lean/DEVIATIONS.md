@@ -46,7 +46,7 @@ Each departure is classified as one of:
 | M Lemma 5.1 (verification query counts) | `Scheme.VerifyCount.*`, `Concrete.Vsf_bounds_fxmssVerify`, `Concrete.Vsl_bounds_slVerify` | stateful path proved on explicit-query `fxmssPkFromSigM` (`simulateQ_fxmssPkFromSigM = Fxmss.pkFromSig`); stateless path proved on `SLHDSA.GeneralScheme.verifyInternalM` (`shrincs_verify_stateless_eq_simulateQ = Shrincs.verify`) (§4.7) |
 | M §6 classical and quantum figures | `Concrete/`, `Concrete/Quantum/` | evaluation of Table 6/7 sums; the SM-DSPR row is the document's conjecture (§2, §4.7) |
 | M Lemma C.8 (quantum ZeroDist) | `Undetectability.ZeroDist.Adaptive.advantage_le_of_lossless` | the document's halting assumption (Remark C.1); stage 2 as effect (§5.2) |
-| M Corollaries C.1, C.3 (arithmetic only) | `Undetectability.ReproHalf.corollaryC1`, `corollaryC3_*` | **pure real-number algebra** over abstract `p₀, p₁ : ℝ` (no quantum Repro/DI-Repro game or quantum Lemma C.5); **Lemma C.3 as hypothesis** (§2, §5.2) |
+| M Lemmas C.1, C.3, C.5; Corollaries C.1, C.3 (QROM) | `Undetectability.ReproQrom.*` (`lemmaC3_both_sharp`, `lemmaC3_half`, `lemmaC3_one`, `lemmaC1`, `corollaryC1`, `diReproProb_eq_reproProb_filterRun`, `diRepro_corollaryC3`); real algebra in `Undetectability.ReproHalf.*` | multi-stage unitary QROM circuit model (`ReproProg`/`DIReproProg`) with fixed per-stage query counts `q : Fin (R + 1) → ℕ` over any finite `[AddCommGroup Y]` (§5.2); no quantum lifting of `B₁`/`B₁⁺` |
 | U Lemmas 1, 2, 3 (endpoint), 7, 8, 10, 11, 13, 14, 15; Theorems 9, 16; Corollary 12 | `Undetectability/` (`TwoStageAdversary.smUdAdv_le`, `smUdAdv_le_xor`, `lemma10`, `lemma11`, `corollary12`) | quantum combs with static `(q₁, q₂)` split (§5.1); `lemma11` uses bare `hopAccept` rather than a comb (§5.1); Lemma 10 and Corollary 12 proved unconditionally for any `[AddCommGroup N]` via the polynomial method (§5.1) |
 
 ---
@@ -58,8 +58,6 @@ Each of these is an explicit hypothesis of the theorems that use it.
 | Result | What the document says | Lean |
 |---|---|---|
 | M Theorem 4.3 / Claim 4.16 (stateless route of Theorem 4.1) | M p. 49: "We quote that bound, restated under the accounting of Section 4.3; its proof is in [HK22]." Claim 4.16 applies the [HK22] reductions, augmented. | `Shrincs.StatelessBound A εsl`: in the game after the PRF and reprogramming hops (`gameHybS`), a stateless-branch forgery wins with probability `≤ εsl`. `εsl : ℝ≥0∞` is an unconstrained abstract bound (not the ten [HK22] summands in Lean); `H_msg^sl` is deterministic and `A` has unbounded local evaluations of `pr.Th`/`pr.HmsgSl`, so stateless cross-binding (`PK.sf ‖ M`) is not exercised by `theorem_4_1`. |
-| M Lemma C.3 (quantum adaptive reprogramming) | M p. 94: "Adapted from the proof of [LGX25, Theorem 7]". Pp. 95–96 sketch how that external proof is modified; the base proof is not reproduced. | `lemmaC3` hypothesis of `corollaryC1`, `corollaryC3_*` (`Undetectability/Rest/ReproHalf.lean`) |
-| M Lemma C.1 | M p. 94: "Lemma C.1 ([GHHM21])", stated without proof. | hypothesis of `corollaryC3_adv_le_min` |
 | M Conjecture 3.1 | Stated as a conjecture; Theorems 4.1 and 4.2 assume it. Lemma 3.2 bounds its failure only in the ideal model. | `GrindComplete pr` hypothesis. Lemma 3.2 is proved separately (`epsGc_shrincs_lt : < 2^-994`). |
 | M SM-DSPR row of Table 6 | Conjectured (M p. 77). | `Concrete/`: the stateless and full sums take `dspr` as an argument; the figures use `dsprRow`, and `slSum_le_slBound` holds for any smaller value. |
 | M Conjecture 4.1 (collection oracle harmless) | Conjecture | Not assumed. Collection budgets are not tracked at all (§4.6). |
@@ -460,11 +458,25 @@ Quantum: Table 5, Claims 6.1–6.4, Remark 6.1, the abstract's `2^58.0–2^59.2`
 
 ### 5.2 Individual results
 
-- **M Corollaries C.1 and C.3 (`Undetectability/Rest/ReproHalf.lean`). Scope.** Only the
-  real-number algebraic deductions from Lemma C.3 (and Lemma C.1) are formalised, over abstract
-  reals `p₀, p₁ : ℝ` and arbitrary `qhat : Fin R → ℕ`. Neither the quantum `Repro`/`DI-Repro`
-  experiment, nor quantum Lemma C.5 (`DI-Repro` → `Repro`), nor the query-count verification for
-  `B₁`/`B₄` is formalised.
+- **M Lemmas C.1, C.3, C.5 and Corollaries C.1, C.3 (`Undetectability/Quantum/ReproQrom.lean`,
+  `Undetectability/Rest/ReproHalf.lean`). Route and scope.**
+  - `ReproQrom.lean` formalises Definitions C.1 (`ReproProg`, `reproProb`) and C.2 (`DIReproProg`,
+    `diReproProb`) in the QROM over any finite `[AddCommGroup Y]` (in particular `{0, 1}^ν` with
+    bitwise XOR) using VCVio's unitary Fourier transform `Quantum.fourierMatrix Y`.
+  - Using Fourier-support tracking and a Parseval Kraus identity (`isQuadForm_reproProbFrom`,
+    `sum_reproProbFrom_reproBranch_zero_le`), it proves the multi-stage Bernoulli fidelity bound
+    `repro_fidelity` directly without relying on external hypotheses, yielding sharp constant `√2`
+    for both `e = 1/2` and `e = 1` (`lemmaC3_both_sharp`), and hence unconditionally:
+    - **M Lemma C.3** (`lemmaC3_half`, `lemmaC3_one`, constant `4`),
+    - **M Lemma C.1** (`lemmaC1`, constant `3R/2`, since `√2 < 3/2` and `√R ≤ R`),
+    - **Quantum Lemma C.5** (`diReproProb_eq_reproProb_filterRun` via `filterRun`), and
+    - **Unconditional Quantum Corollaries C.1 and C.3** (`corollaryC1`, `diRepro_corollaryC3`).
+  - **Model scope:** `ReproProg` / `DIReproProg` models multi-stage unitary circuits with fixed
+    per-stage query counts `q : Fin (R + 1) → ℕ`, classical readout `callX2` after each stage, and
+    a projective final measurement (rather than general adaptive `QuantumComp` programs with
+    random query schedules `q̂_j`). The real-number algebraic helpers in `ReproHalf.lean` remain
+    reusable over abstract reals `p₀, p₁ : ℝ`. No quantum lifting of the SHRINCS/FXMSS reductions
+    `B₁`/`B₁⁺` is formalised (Theorems 4.1 and 4.2 remain classical).
 - **U Lemma 3 (Markov brothers). Scope.** Only the endpoint form `|P′(±1)| ≤ d²` is proved
   (`abs_derivative_eval_one_le`), from Mathlib's Chebyshev extremality. That is the only use in U
   (p. 9, proof of Lemma 7: "t = −1 gives…"). The full interior inequality is not in Mathlib.

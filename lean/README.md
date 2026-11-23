@@ -43,7 +43,7 @@ document's result and the Lean declaration that proves it. Every declaration dep
 | Main, §4.8 | Theorem 4.1 (SHRINCS), Claims 4.11–4.15; Claim 4.16 (stateless route, which the paper takes from [HK22]) is the explicit hypothesis `StatelessBound` | `Shrincs.theorem_4_1`, `theorem_4_1_of_ud_le`, `corollary_4_1` (`B1S_diAdvantage_le`), `claim_4_11` … `claim_4_15`, Stage-1 `O_coll` virtual-tree precomputation `B2S`–`B8S` (`ShrincsSecurity/Shrincs/VirtualTree.lean`, `Claim415.lean`) | done (see `DEVIATIONS.md` §4.6) |
 | Main, §6 | Classical figures: Table 5 (122.23 / 122.75 / 121.47 bits), Eqs. (1), (3), (9), Section 6.4, Remark 6.1, Table 8 | `ShrincsSecurity/Concrete/` (kernel-checked evaluation of the paper's sums of Table 6 bounds; SM-DSPR row taken as the paper's conjecture; row links to Cor. G.1, Cor. C.2, Thm. E.1, ITSR Thm. 2, Thm. F.2 in `Concrete/Generic.lean`) | done |
 | Main, §6 | Quantum figures: Table 5 quantum columns, Claims 6.1–6.4, Remark 6.1 (11.7 / 11.2 bits, floor `2^-3.4`), abstract's `2^58.0`–`2^59.2` | `ShrincsSecurity/Concrete/Quantum/` | done |
-| Main, App. C | Lemma C.8 (quantum ZeroDist `≤ 2q/√|P|`); Corollaries C.1, C.3 arithmetic from Lemma C.3 (quoted from [LGX25], a hypothesis) | `Undetectability/Quantum/ZeroDistAdaptive.lean` (`advantage_le_of_lossless`), `Undetectability/Rest/ReproHalf.lean` (real algebra only; see `DEVIATIONS.md` §5.2) | done |
+| Main, App. C | Lemma C.8 (quantum ZeroDist `≤ 2q/√|P|`); QROM Definitions C.1–C.2, Lemma C.3 (`e ∈ {1, 1/2}`, sharp `√2` ⇒ `4`), Lemma C.1 (`3R/2`), quantum Lemma C.5 (`filterRun`), unconditional quantum Corollaries C.1 & C.3 | `Undetectability/Quantum/ZeroDistAdaptive.lean` (`advantage_le_of_lossless`), `Undetectability/Quantum/ReproQrom.lean` (`lemmaC3_both_sharp`, `lemmaC3_half`, `lemmaC3_one`, `lemmaC1`, `corollaryC1`, `diReproProb_eq_reproProb_filterRun`, `diRepro_corollaryC3`), `Undetectability/Rest/ReproHalf.lean` | done (see `DEVIATIONS.md` §5.2) |
 | Undetectability | Lemmas 1, 2, 3 (endpoint form), 7, 8, 10 (proved via polynomial method), 11, 13, 14, 15; Theorems 9, 16; Corollary 12 (unconditional) | `Undetectability/Poly/`, `Marginal/`, `Theorems/` (`lemma10`, `corollary12`), `Rest/` (quantum combs) | done |
 | — | Evidence for `DEVIATIONS.md` and `notes/paper-issues.md` | `ShrincsSecurity/Evidence/` | done |
 
@@ -58,8 +58,6 @@ an explicit hypothesis of the theorems that use it, never an axiom:
 - **Assumption 4.1** (named functions modeled as independent random functions): built into the
   model, in which the named functions are separate objects; `ε_ds` is therefore outside the model.
 - **Theorem 4.3 / Claim 4.16** are quoted from [HK22]: hypothesis `StatelessBound` of Theorem 4.1.
-- **Lemma C.3** (adapted from [LGX25]) and **Lemma C.1** ([GHHM21]): hypotheses of Corollaries C.1
-  and C.3.
 - **The SM-DSPR bound of Table 6** is conjectured: an explicit argument of the Section 6 sums.
 
 `notes/paper-structure.md` maps every definition, lemma and theorem of the three documents, with

@@ -24,6 +24,7 @@ public import ShrincsSecurity.Undetectability.Poly.All
 public import ShrincsSecurity.Evidence.SmUdHop
 public import ShrincsSecurity.Evidence.MainPaper
 public import ShrincsSecurity.Undetectability.Quantum.ZeroDistAdaptive
+public import ShrincsSecurity.Undetectability.Quantum.ReproQrom
 public import ShrincsSecurity.Undetectability.Theorems.All
 public import ShrincsSecurity.Undetectability.Rest.All
 public import ShrincsSecurity.Shrincs.Theorem41
