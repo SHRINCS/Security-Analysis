@@ -409,21 +409,28 @@ theorem unusedCount_init (K : Keys pr) (c : (roSpec pr Msg).QueryCache) :
   exact Finset.card_image_le
 
 omit [Fintype pr.Y] [Fintype pr.PkSeed] [DecidableEq pr.PkSeed] [Fintype pr.Digest]
+  [DecidableEq pr.Digest] [SampleableType pr.Digest] [Fintype Msg] [DecidableEq Msg]
+  [Inhabited pr.Digest] [Nontrivial Msg] in
+/-- The structure phase of `B₁` makes at most `q_{h,1}` queries to `O_b`. -/
+theorem fwd_hashBound {qs qh₁ qh₂ L : ℕ} (A : Forger pr Msg slKeygen qs qh₁ qh₂ L) :
+    (simulateQ (fwd pr Msg) A.chooseShape).IsQueryBoundP
+      (Repro.IsHashQuery pr.Y (X2 pr Msg)) qh₁ := by
+  refine A.roBound₁.simulateQ_of_step (fun t ht => ?_) (fun t ht => ?_)
+  · rcases t with n | x
+    · exact ht.elim
+    · simp [fwd, Repro.IsHashQuery]
+  · rcases t with n | x
+    · simp [fwd, Repro.IsHashQuery]
+    · exact (ht trivial).elim
+
+omit [Fintype pr.Y] [Fintype pr.PkSeed] [DecidableEq pr.PkSeed] [Fintype pr.Digest]
   [DecidableEq pr.Digest] [SampleableType pr.Digest] [Fintype Msg] [DecidableEq Msg] in
 /-- `B₁` makes at most `q_{h,1} + q_{h,2} + L + 1` queries to `O_b`. -/
 theorem B1run_hashBound {qs qh₁ qh₂ L : ℕ} (A : Forger pr Msg slKeygen qs qh₁ qh₂ L) :
     (B1run pr Msg slKeygen A.toFxmssAdversary).IsQueryBoundP
       (Repro.IsHashQuery pr.Y (X2 pr Msg)) (qh₁ + qh₂ + L + 1) := by
   have hnot : ∀ n, ¬ Repro.IsHashQuery pr.Y (X2 pr Msg) (.inl n) := fun _ h => h
-  have h1 : (simulateQ (fwd pr Msg) A.chooseShape).IsQueryBoundP
-      (Repro.IsHashQuery pr.Y (X2 pr Msg)) qh₁ := by
-    refine A.roBound₁.simulateQ_of_step (fun t ht => ?_) (fun t ht => ?_)
-    · rcases t with n | x
-      · exact ht.elim
-      · simp [fwd, Repro.IsHashQuery]
-    · rcases t with n | x
-      · simpa [fwd] using hnot n
-      · exact (ht trivial).elim
+  have h1 := fwd_hashBound slKeygen A
   unfold B1run
   refine (isQueryBoundP_bind (n := 0) (m := qh₁ + (qh₂ + 1 + L)) (liftM_bound _ _ hnot)
     fun pk _ => isQueryBoundP_bind (n := qh₁) (m := qh₂ + 1 + L) h1 fun z hz => ?_).mono

@@ -3,7 +3,7 @@ module
 public import ShrincsSecurity.Fxmss.Bridge
 public import ShrincsSecurity.Fxmss.Remark46
 public import ShrincsSecurity.Fxmss.Claim41
-public import ShrincsSecurity.Fxmss.Claim42
+public import ShrincsSecurity.Fxmss.Claim42Pre
 public import ShrincsSecurity.Fxmss.G2Hyb
 public import ShrincsSecurity.Fxmss.Claim410
 public import ShrincsSecurity.Fxmss.HybExtract
@@ -35,14 +35,14 @@ public import ShrincsSecurity.Repro.Bound
 
 where `B₀ … B₈` are the explicit reductions of Claims 4.1–4.9 built from `A`, with the paper's
 target counts (`L`, `L·lsf`, `L·lsf·w`, `L`, `I = L − 1`, `L + I`) and query counts
-(`q̃_h = q_h + 1` for `B₀`, `q_s + q_h + 1` with `q_s := L` for `B₁`). The `w`-term is a sum over
-the `w − 2` transitions; `theorem_4_2_of_ud_le` relaxes it to `w · ε` for a common bound `ε`.
-`corollary_4_2` instantiates the two random-oracle terms with the generic classical bounds:
-`Succ^{SM-rTCR,1}(B₀) ≤ (q_h + 2)/2^{2n} + (q_h + 1)/2^n` (Corollary G.1) and
-`Adv^{DI-Repro}(B₁) ≤ (L + q_h + 1)/2^n` (Corollary C.2). The other terms are standard-model
-(collection) advantages and stay as they are: the games of the generic bounds of Appendix E
-(Theorem E.1) model `Th` as a random oracle without a collection oracle, which is not the game
-`B₈` plays.
+(`q̃_h = q_h + 1` for `B₀`; `L + q_h + 1` hash queries and `L` reprogramming calls for `B₁`). The
+`w`-term is a sum over the `w − 2` transitions; `theorem_4_2_of_ud_le` relaxes it to `w · ε` for a
+common bound `ε`. `corollary_4_2` instantiates the two random-oracle terms with the generic
+classical bounds: `Succ^{SM-rTCR,1}(B₀) ≤ (q_h + 2)/2^{2n} + (q_h + 1)/2^n` (Corollary G.1) and
+`Adv^{DI-Repro}(B₁) ≤ E[q_pre]/2^n ≤ q_h/2^n` (Corollary C.2, `B1_diAdvantage_le`). The other terms
+are standard-model (collection) advantages and stay as they are: the games of the generic bounds
+of Appendix E (Theorem E.1) model `Th` as a random oracle without a collection oracle, which is
+not the game `B₈` plays.
 
 ## The proof (telescoping)
 
@@ -67,7 +67,13 @@ Claim 4.6 bounds it.
 * **`PK.sl`** is an extra public value drawn by an arbitrary `slKeygen : PK.seed → ProbComp Y`.
 * **Remark 4.6** is realised inside the games: after the forgery is verified, every anchor is
   signed (with a message different from `M*`); `Remark46.lean` proves the paper's wrapper lemma
-  for the EU-CMA experiment itself.
+  for the EU-CMA experiment itself (`succ_wrap`, no extra random-oracle query). Its signing
+  budget is `q_s + L`, not `L`: signing queries answered `⊥` (leaves outside the structure or
+  already used) still log their messages, so a forger whose `L` queries all miss the structure
+  needs `L` more to sign every anchor, and dropping its `⊥` queries would change the message log
+  (only `Succ(A) ≤ Succ(A′)` would remain). For forgers that, as the paper assumes, query only
+  distinct anchors, `A`'s queries and the wrapper's together are the `L` anchors
+  (`length_wrapIds`).
 * **Claim 4.10** needs the digit encoding `yToBytes` injective (`hinj`), and is stated with
   witnesses computed from the forgery (`Events.lean`).
 -/
@@ -169,15 +175,16 @@ theorem theorem_4_2_of_ud_le (hP : P.Valid) (hinj : Function.Injective pr.yToByt
 
 /-- **Theorem 4.2 with the generic random-oracle bounds** (Corollaries G.1 and C.2): the SM-rTCR
 term of `B₀` (which makes `q̃_h = q_h + 1` queries to `H_msg^sf`) is at most
-`(q̃_h + 1)/|{0,1}^{2n}| + q̃_h/|R|`, and the DI-Repro term of `B₁` (with
-`q_s + q_h + 1 = L + q_h + 1` hash queries) is at most `(L + q_h + 1)/|R|`. The remaining terms are
-standard-model (collection) advantages. -/
+`(q̃_h + 1)/|{0,1}^{2n}| + q̃_h/|R|`, and the DI-Repro term of `B₁` is at most `q_h/|R|`
+(`B1_diAdvantage_le`: only the forger's queries made before their point is reprogrammed count,
+the `q_pre` of Corollary C.2; `B₁`'s read-backs and the verification query never do). The
+remaining terms are standard-model (collection) advantages. -/
 theorem corollary_4_2 (hP : P.Valid) (hinj : Function.Injective pr.yToBytes)
     (hgc : GrindComplete pr) {qs qh₁ qh₂ L : ℕ} (A : Forger pr Msg slKeygen qs qh₁ qh₂ L) :
     succ pr Msg slKeygen A.toFxmssAdversary ≤
       (((qh₁ + qh₂ + 1 : ℕ) : ℝ≥0∞) + 1) / Fintype.card pr.Digest +
         ((qh₁ + qh₂ + 1 : ℕ) : ℝ≥0∞) / Fintype.card pr.Y +
-      ((qh₁ + qh₂ + L + 1 : ℕ) : ℝ≥0∞) / Fintype.card pr.Y +
+      ((qh₁ + qh₂ : ℕ) : ℝ≥0∞) / Fintype.card pr.Y +
       STCR_Succ (B2 pr Msg slKeygen A) +
       ∑ γ ∈ Finset.range (P.w - 2), SM_DT_UD_Advantage (B3 pr Msg slKeygen γ A) +
       SM_DT_TCR_Advantage (B4 pr Msg slKeygen A) +
@@ -187,11 +194,7 @@ theorem corollary_4_2 (hP : P.Valid) (hinj : Function.Injective pr.yToBytes)
       SMTCRExcl_Succ (B8 pr Msg slKeygen A) := by
   refine (theorem_4_2 pr Msg slKeygen hP hinj hgc A).trans ?_
   have hr := Generic.RandomSamplingTCR.advantage_le_of_one (fun _ => true) (B0 pr Msg slKeygen A)
-  have hd : ENNReal.ofReal (Repro.diAdvantage (B1 pr Msg slKeygen A)) ≤
-      ((qh₁ + qh₂ + L + 1 : ℕ) : ℝ≥0∞) / Fintype.card pr.Y := by
-    refine (ENNReal.ofReal_le_ofReal (Repro.diAdvantage_le (B1 pr Msg slKeygen A))).trans ?_
-    rw [ENNReal.ofReal_div_of_pos (by exact_mod_cast Fintype.card_pos), ENNReal.ofReal_natCast,
-      ENNReal.ofReal_natCast]
+  have hd := B1_diAdvantage_le pr Msg slKeygen A
   gcongr
 
 end ShrincsSecurity.Fxmss.Rom
