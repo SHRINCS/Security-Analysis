@@ -26,3 +26,4 @@ public import ShrincsSecurity.Evidence.MainPaper
 public import ShrincsSecurity.Undetectability.Quantum.ZeroDistAdaptive
 public import ShrincsSecurity.Undetectability.Theorems.All
 public import ShrincsSecurity.Undetectability.Rest.All
+public import ShrincsSecurity.Shrincs.Theorem41

@@ -36,7 +36,7 @@ Work in progress. Each row names the document's result and the Lean declaration 
 | Main, §2–3 | Scheme, Lemma 3.1 (i) (correctness) | `Scheme/Shrincs.lean` (`verify_sign`, `execute_correct`) | done |
 | Main, §4.3 / App. D.3 | Lemma 4.2, classical (independent functions are harmless), instantiated for Lemma C.9, SM-TCR, Repro, DI-Repro | `gameExt_eq_game_dropExt`, `smtcrGameExt_eq`, `diAdvantageExt_eq` (`Notions/Generic/IndependentFunctions.lean`) | done |
 | Main, §4.7 | Theorem 4.2 (FXMSS, classical ROM for `H_msg^sf`, Conjecture 3.1 as hypothesis `GrindComplete`), Claims 4.1–4.10, Remark 4.6 | `Fxmss.Rom.theorem_4_2`, `corollary_4_2` (SM-rTCR and DI-Repro terms replaced by their classical bounds), `claim_4_1` … `claim_4_9`, `Honest.claim_4_10` (`ShrincsSecurity/Fxmss/`) | done; time ξ replaced by explicit reductions; collection budgets unbounded (Conjecture 4.1 territory) |
-| Main, §4.8 | Theorem 4.1 (SHRINCS), Claims 4.11–4.16 | | planned |
+| Main, §4.8 | Theorem 4.1 (SHRINCS), Claims 4.11–4.15; Claim 4.16 (stateless route, which the paper takes from [HK22]) is the explicit hypothesis `StatelessBound` | `Shrincs.theorem_4_1`, `claim_4_11` … `claim_4_15` (`ShrincsSecurity/Shrincs/`) | done; see `DEVIATIONS.md` |
 | Main, §6 | Classical figures: Table 5 (122.23 / 122.75 / 121.47 bits), Eqs. (1), (3), (9), Section 6.4 constants, Remark 6.1, Table 8 | `ShrincsSecurity/Concrete/` (kernel-checked evaluation of the paper's sums of Table 6 bounds; SM-DSPR row taken as the paper's conjecture) | done (numerics only; linked to the games once Theorems 4.1–4.2 land) |
 | Undetectability | quantum sm-ud / sm-pre bounds | | planned (VCVio quantum layer) |
 
