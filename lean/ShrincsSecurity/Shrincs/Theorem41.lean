@@ -8,6 +8,7 @@ public import ShrincsSecurity.Shrincs.Claim413
 public import ShrincsSecurity.Shrincs.Claim414
 public import ShrincsSecurity.Shrincs.Claim415
 public import ShrincsSecurity.Shrincs.PrfMsgBound
+public import ShrincsSecurity.Shrincs.PrfBound
 
 /-!
 # Theorem 4.1: EU-CMA security of SHRINCS
@@ -43,7 +44,7 @@ hypothesis of Claim 4.10 in Theorem 4.2).
 `theorem_4_1`: for every forger `A` (Definition 4.15; `q_s` signing queries, `q_{h,1} + q_{h,2}`
 queries to `H_msg^sf`, structures with at most `L` anchors) with `StatelessBound A ε_sl`,
 
-`Succ^{SHRINCS-EU-CMA}(A) ≤ Adv^{prf}_{PRF}(B_prf) + Adv^{prf}_{PRF_msg, q_s}(B_prfmsg)
+`Succ^{SHRINCS-EU-CMA}(A) ≤ Adv^{prf}_{PRF, q₁}(B_prf) + Adv^{prf}_{PRF_msg, q_s}(B_prfmsg)
   + Adv^{SM-rTCR,1}(B₀(A_F)) + Adv^{DI-Repro}(B₁⁺)
   + Succ^{S-TCR(Prop)}(B₂(A_F)) + Σ_{γ < w−2} Adv^{sm-ud}(B₃,γ(A_F)) + Succ^{sm-tcr}(B₄(A_F))
   + Succ^{sm-pre}(B₅(A_F)) + Succ^{sm-tcr}(B₆(A_F)) + Succ^{sm-tcr}(B₇(A_F))
@@ -75,14 +76,13 @@ right-hand side is immediate.
 
 ## Deviations from the paper
 
-* **Time and budgets** are replaced by explicit reductions, as in Theorem 4.2. `B_prfmsg` is an
-  adversary of Definition 4.3 with the paper's budget `q_s` (`BprfmsgAdv`, `PrfMsgBound.lean`;
-  the completion of Remark 4.6 is not part of `GAME.0`–`GAME.2`, so `q_s` and not `q_s^{sl} + L`).
-  The `PRF` term is the advantage of the explicit reduction `B_prf` without the budget `q₁`
-  (VCVio's `prfAdvantage`): `B_prf` queries its oracle once per stateful secret element and once
-  per secret draw of the stateless programs, repeated draws included, and bounding the latter by
-  the number of secret elements of the hypertree would need the address ranges of VCVio's FIPS 205
-  programs, which the proof does not otherwise use.
+* **Time and budgets** are replaced by explicit reductions, as in Theorem 4.2. Both PRF terms
+  are advantages of adversaries of Definition 4.3 with the paper's budgets:
+  `B_prf` (`BprfAdv`, `PrfBound.lean`) caches its oracle's answers and makes at most
+  `q₁ = L · lsf + slSecretCount` pairwise distinct queries, `slSecretCount = wotsInstanceCount ·
+  len + 2^h · k · 2^a` the number of secret elements of the hypertree; `B_prfmsg` (`BprfmsgAdv`,
+  `PrfMsgBound.lean`) makes at most `q_s` (the completion of Remark 4.6 is not part of
+  `GAME.0`–`GAME.2`, so `q_s` and not `q_s^{sl} + L`).
 * **Collection budgets** `q̃_{λ,i}`, `q_λ` are not tracked (the collection games of VCVio carry
   none), as in Theorem 4.2; the augmented reductions evaluate the stateless path inside `A_F`.
 * **Finite messages.** The message space is a finite type `Msg` encoding the pairs `(ctx, M)`
@@ -157,7 +157,7 @@ theorem theorem_4_1 (hinj : Function.Injective pr.yToBytes) (hgc : GrindComplete
     {qs qh₁ qh₂ L : ℕ} (A : Forger pr Msg enc qs qh₁ qh₂ L) {εsl : ℝ≥0∞}
     (hsl : StatelessBound pr Msg enc A.toShrincsAdversary εsl) :
     succ pr Msg enc A.toShrincsAdversary ≤
-      (Notions.KeyedHash.toPRF (prfF pr)).prfAdvantage (Bprf pr Msg enc A.toShrincsAdversary) +
+      Notions.prfAdv (Notions.KeyedHash.toPRF (prfF pr)) (BprfAdv pr Msg enc A) +
       Notions.prfAdv (Notions.KeyedHash.toPRF (prfMsgF pr))
         (BprfmsgAdv pr Msg enc A.toShrincsAdversary) +
       Notions.Generic.RandomSamplingTCR.advantage (fun _ => true) 1
@@ -172,7 +172,7 @@ theorem theorem_4_1 (hinj : Function.Injective pr.yToBytes) (hgc : GrindComplete
       SM_DT_TCR_Advantage (Fxmss.Rom.B7 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
       Notions.SMTCRExcl_Succ (Fxmss.Rom.B8 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
       εsl := by
-  rw [show Notions.prfAdv (Notions.KeyedHash.toPRF (prfMsgF pr))
+  rw [prfAdv_BprfAdv, show Notions.prfAdv (Notions.KeyedHash.toPRF (prfMsgF pr))
       (BprfmsgAdv pr Msg enc A.toShrincsAdversary) =
     (Notions.KeyedHash.toPRF (prfMsgF pr)).prfAdvantage
       (Bprfmsg pr Msg enc A.toShrincsAdversary) from rfl]
