@@ -211,6 +211,77 @@ theorem theorem_4_1 (hinj : Function.Injective pr.yToBytes) (hgc : GrindComplete
         refine this.trans (le_of_eq ?_)
         ring
 
+/-- **Theorem 4.1, the paper's `w · InSec^{sm-ud}` form**: with a common bound `ε` on the SM-UD
+advantages of the `w − 2` hybrid reductions, the SM-UD term is at most `w · ε`. -/
+theorem theorem_4_1_of_ud_le (hinj : Function.Injective pr.yToBytes) (hgc : GrindComplete pr)
+    {qs qh₁ qh₂ L : ℕ} (A : Forger pr Msg enc qs qh₁ qh₂ L) {εsl ε : ℝ≥0∞}
+    (hsl : StatelessBound pr Msg enc A.toShrincsAdversary εsl)
+    (hε : ∀ γ < vp.params.w - 2,
+      SM_DT_UD_Advantage (Fxmss.Rom.B3 pr (BMsg pr Msg) (slKeygenS pr) γ (AF pr Msg enc A)) ≤ ε) :
+    succ pr Msg enc A.toShrincsAdversary ≤
+      Notions.prfAdv (Notions.KeyedHash.toPRF (prfF pr)) (BprfAdv pr Msg enc A) +
+      Notions.prfAdv (Notions.KeyedHash.toPRF (prfMsgF pr))
+        (BprfmsgAdv pr Msg enc A.toShrincsAdversary) +
+      Notions.Generic.RandomSamplingTCR.advantage (fun _ => true) 1
+        (Fxmss.Rom.B0 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
+      ENNReal.ofReal (Repro.diAdvantage (B1S pr Msg enc A)) +
+      Notions.STCR_Succ (Fxmss.Rom.B2 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
+      vp.params.w * ε +
+      SM_DT_TCR_Advantage (Fxmss.Rom.B4 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
+      SM_DT_PRE_Advantage (Fxmss.Rom.B5 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
+      SM_DT_TCR_Advantage (Fxmss.Rom.B6 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
+      SM_DT_TCR_Advantage (Fxmss.Rom.B7 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
+      Notions.SMTCRExcl_Succ (Fxmss.Rom.B8 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
+      εsl := by
+  refine (theorem_4_1 pr Msg enc hinj hgc A hsl).trans ?_
+  gcongr
+  calc ∑ γ ∈ Finset.range (vp.params.w - 2),
+          SM_DT_UD_Advantage (Fxmss.Rom.B3 pr (BMsg pr Msg) (slKeygenS pr) γ (AF pr Msg enc A))
+      ≤ ∑ _γ ∈ Finset.range (vp.params.w - 2), ε :=
+        Finset.sum_le_sum fun γ hγ => hε γ (Finset.mem_range.mp hγ)
+    _ = ((vp.params.w - 2 : ℕ) : ℝ≥0∞) * ε := by simp
+    _ ≤ vp.params.w * ε := by gcongr; exact_mod_cast Nat.sub_le _ _
+
+/-- **Theorem 4.1 with the generic random-oracle bounds** (Corollaries G.1 and C.2/C.3): the
+SM-rTCR term of `B₀(A_F)` is at most `(q_h + 2)/|Digest| + (q_h + 1)/|Y|`, and the DI-Repro term of
+`B₁⁺` is at most `q_h/|Y|` (`B1S_diAdvantage_le`), with `q_h = q_{h,1} + q_{h,2}`. -/
+theorem corollary_4_1 (hinj : Function.Injective pr.yToBytes) (hgc : GrindComplete pr)
+    {qs qh₁ qh₂ L : ℕ} (A : Forger pr Msg enc qs qh₁ qh₂ L) {εsl : ℝ≥0∞}
+    (hsl : StatelessBound pr Msg enc A.toShrincsAdversary εsl) :
+    succ pr Msg enc A.toShrincsAdversary ≤
+      Notions.prfAdv (Notions.KeyedHash.toPRF (prfF pr)) (BprfAdv pr Msg enc A) +
+      Notions.prfAdv (Notions.KeyedHash.toPRF (prfMsgF pr))
+        (BprfmsgAdv pr Msg enc A.toShrincsAdversary) +
+      (((qh₁ + qh₂ + 1 : ℕ) : ℝ≥0∞) + 1) / Fintype.card pr.Digest +
+        ((qh₁ + qh₂ + 1 : ℕ) : ℝ≥0∞) / Fintype.card pr.Y +
+      ((qh₁ + qh₂ : ℕ) : ℝ≥0∞) / Fintype.card pr.Y +
+      Notions.STCR_Succ (Fxmss.Rom.B2 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
+      ∑ γ ∈ Finset.range (vp.params.w - 2),
+        SM_DT_UD_Advantage (Fxmss.Rom.B3 pr (BMsg pr Msg) (slKeygenS pr) γ (AF pr Msg enc A)) +
+      SM_DT_TCR_Advantage (Fxmss.Rom.B4 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
+      SM_DT_PRE_Advantage (Fxmss.Rom.B5 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
+      SM_DT_TCR_Advantage (Fxmss.Rom.B6 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
+      SM_DT_TCR_Advantage (Fxmss.Rom.B7 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
+      Notions.SMTCRExcl_Succ (Fxmss.Rom.B8 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
+      εsl := by
+  refine (theorem_4_1 pr Msg enc hinj hgc A hsl).trans ?_
+  have hr := Notions.Generic.RandomSamplingTCR.advantage_le_of_one (fun _ => true)
+    (Fxmss.Rom.B0 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A))
+  have hd := B1S_diAdvantage_le pr Msg enc A
+  have hsum :
+      Notions.prfAdv (Notions.KeyedHash.toPRF (prfF pr)) (BprfAdv pr Msg enc A) +
+      Notions.prfAdv (Notions.KeyedHash.toPRF (prfMsgF pr))
+        (BprfmsgAdv pr Msg enc A.toShrincsAdversary) +
+      ((((qh₁ + qh₂ + 1 : ℕ) : ℝ≥0∞) + 1) / Fintype.card pr.Digest +
+        ((qh₁ + qh₂ + 1 : ℕ) : ℝ≥0∞) / Fintype.card pr.Y) =
+      Notions.prfAdv (Notions.KeyedHash.toPRF (prfF pr)) (BprfAdv pr Msg enc A) +
+      Notions.prfAdv (Notions.KeyedHash.toPRF (prfMsgF pr))
+        (BprfmsgAdv pr Msg enc A.toShrincsAdversary) +
+      (((qh₁ + qh₂ + 1 : ℕ) : ℝ≥0∞) + 1) / Fintype.card pr.Digest +
+        ((qh₁ + qh₂ + 1 : ℕ) : ℝ≥0∞) / Fintype.card pr.Y := by ring
+  rw [← hsum]
+  gcongr
+
 end ShrincsSecurity.Shrincs
 
 end

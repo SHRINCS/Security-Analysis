@@ -445,13 +445,21 @@ theorem succ_le [Fintype N] [Fintype P] (X : ExclusiveTweaks T) (p : ℕ) {σ : 
   (prEvent_game_le (interface X p) A.toHiddenSlice).1.trans
     (add_le_add (succ_game1_le X p A) le_rfl)
 
+/-- **Theorem E.1** (classical case), weak stage-max form: if each stage makes at most `q`
+evaluations of `Th`, the adversary succeeds with probability at most `(q + 1)/|N| + q/|P|`. -/
+theorem succ_le_of_le_each [Fintype N] [Fintype P] (X : ExclusiveTweaks T) (p : ℕ) {σ : Type}
+    {q₁ q₂ q : ℕ} (A : Adversary P T M N σ q₁ q₂) (hq₁ : q₁ ≤ q) (hq₂ : q₂ ≤ q) :
+    succ X p A ≤ (q + 1) / Fintype.card N + q / Fintype.card P := by
+  refine (succ_le X p A).trans (add_le_add ?_ ?_)
+  · refine ENNReal.div_le_div_right ?_ _; norm_cast; omega
+  · refine ENNReal.div_le_div_right ?_ _; norm_cast
+
 /-- **Theorem E.1** (classical case), in the paper's form: an adversary making at most `q`
 evaluations of `Th` in total succeeds with probability at most `(q + 1)/|N| + q/|P|`. -/
 theorem succ_le_of_le [Fintype N] [Fintype P] (X : ExclusiveTweaks T) (p : ℕ) {σ : Type}
     {q₁ q₂ q : ℕ} (A : Adversary P T M N σ q₁ q₂) (hq : q₁ + q₂ ≤ q) :
-    succ X p A ≤ (q + 1) / Fintype.card N + q / Fintype.card P := by
-  refine (succ_le X p A).trans (add_le_add ?_ ?_) <;>
-    refine ENNReal.div_le_div_right ?_ _ <;> norm_cast <;> omega
+    succ X p A ≤ (q + 1) / Fintype.card N + q / Fintype.card P :=
+  succ_le_of_le_each X p A (by omega) (by omega)
 
 end SmTcrExcl
 

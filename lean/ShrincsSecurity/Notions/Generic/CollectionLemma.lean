@@ -23,9 +23,15 @@ its challenge oracle and `Φ` its winning condition, both evaluating the hidden 
 `Th(P', ·)`. Its `Reservation` data names the tweaks reserved by the challenge history (`res`),
 the tweaks a challenge reserves (`chalRes`: its tweak, and for sm-tcr-excl also the partner
 `ω(T)`), the challenge oracle's own refusal test, and the refusal answer `⊥`. The `Discipline`
-hypotheses hold for every property of Definition 4.12: a refused challenge is answered `⊥`
-without effect; an accepted one evaluates the slice only at the tweaks it reserves and reserves
-exactly those; `Φ` evaluates the slice only at reserved tweaks.
+hypotheses hold for the properties of Definition 4.12 whose challenge refusal depends only on the
+challenge state and query (such as SM-TCR, SM-PRE, SM-UD, SM-DSPR, SM-TCR-EXCL; `S-TCR(Prop)` is
+excluded because refusal due to no valid counter depends on the random slice values): a refused
+challenge is answered `⊥` without effect; an accepted one evaluates the slice only at the tweaks it
+reserves and reserves exactly those; `Φ` evaluates the slice only at reserved tweaks.
+
+Note: `standAlone` removes the collection oracle `CollSpec`, while retaining the full collection
+oracle `ROSpec P (T × X) N` in the adversary's direct evaluations (Step 3 of Appendix D.2 is
+replaced by a second use of Lemma C.9 rather than simulating the other members locally).
 
 The collection experiment (`collInterface`, Definition 4.12) adds the collection oracle to `Σ`
 and enforces the reservation rule in both orders: a challenge is refused if a tweak it would
@@ -315,10 +321,11 @@ structure Reservation (cs : OracleSpec ιc) (σ T : Type) where
   /-- Whether an answer is not the refusal. -/
   accepted : (d : ιc) → cs.Range d → Bool
 
-/-- **Reservation discipline** of a stand-alone property, satisfied by every property of
-Definition 4.12. A refused challenge is answered `⊥` without effect; an accepted challenge
-evaluates the slice only at the tweaks it reserves and reserves exactly those; the winning
-condition `Φ` evaluates the slice only at reserved tweaks. -/
+/-- **Reservation discipline** of a stand-alone property whose refusal depends only on the
+challenge state and query (e.g. SM-TCR, SM-PRE, SM-UD, SM-DSPR, SM-TCR-EXCL; not `S-TCR(Prop)`,
+whose refusal depends on the slice values). A refused challenge is answered `⊥` without effect; an
+accepted challenge evaluates the slice only at the tweaks it reserves and reserves exactly those;
+the winning condition `Φ` evaluates the slice only at reserved tweaks. -/
 structure Discipline (I : Interface (T × X) N cs σ α) (R : Reservation cs σ T) : Prop where
   accepted_refuse : ∀ d, R.accepted d (R.refuse d) = false
   run_of_refused : ∀ s d, R.refused s d = true → (I.impl d).run s = pure (R.refuse d, s)

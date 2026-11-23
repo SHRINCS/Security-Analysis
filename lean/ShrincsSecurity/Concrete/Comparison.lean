@@ -17,8 +17,8 @@ Two classical results are switched back, one at a time:
 
 and, with all classical ones switched back, `fullBoundF2C2` (the stateless and stateful bounds with
 all switched back are `slBoundF2` and `sfBoundC2`). The other two results of Remark 6.1 are quantum
-and out of scope. All other terms are as in `Concrete.Paths`; the stateless and full-scheme
-variants use the conjectured SM-DSPR row.
+and live in `Concrete.Quantum.Comparison`. All other terms are as in `Concrete.Paths`; the
+stateless and full-scheme variants use the conjectured SM-DSPR row.
 
 ## Results (paper → certified)
 

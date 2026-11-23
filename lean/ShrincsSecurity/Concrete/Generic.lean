@@ -1,6 +1,11 @@
 module
 
 public import ShrincsSecurity.ITSR.Concrete.Certify
+public import ShrincsSecurity.ITSR.Theorem2
+public import ShrincsSecurity.ITSR.TheoremF2
+public import ShrincsSecurity.Notions.Generic.RandomSamplingTCR
+public import ShrincsSecurity.Notions.Generic.ExclusiveTweaks
+public import ShrincsSecurity.Repro.Bound
 public import Mathlib.Analysis.SpecialFunctions.Log.Base
 
 /-!
@@ -318,6 +323,93 @@ theorem logb_xiStar_bracket {B : ℕ → ℝ} {ξ₀ ξ₁ : ℕ} (h : ξ₀ < x
     (h₀ : 2 ^ A ≤ (ξ₀ + 1) ^ N) (h₁ : ξ₁ ^ N ≤ 2 ^ B') :
     a ≤ Real.logb 2 (xiStar B) ∧ Real.logb 2 (xiStar B) ≤ b :=
   logb_bracket (xiStar_two_rpow_bracket h hN A B' ha hb h₀ h₁)
+
+/-! ## Links to the proved classical generic bounds -/
+
+section GameLinks
+
+open OracleComp
+open scoped ENNReal
+
+/-- The classical SM-TCR-EXCL row of Table 6 is **Theorem E.1**
+(`Notions.Generic.SmTcrExcl.succ_le`). -/
+theorem smTcrExclBound_theoremE1 {P T M N : Type} [DecidableEq P] [DecidableEq T] [DecidableEq M]
+    [DecidableEq N] [SampleableType P] [SampleableType N] [Fintype N] [Fintype P]
+    (X : Notions.ExclusiveTweaks T) (p : ℕ) {σ : Type} {q₁ q₂ : ℕ}
+    (A : Notions.Generic.SmTcrExcl.Adversary P T M N σ q₁ q₂) :
+    Notions.Generic.SmTcrExcl.succ X p A ≤
+      ENNReal.ofReal (smTcrExclBound (Fintype.card N) (Fintype.card P) q₂ q₁) := by
+  refine (Notions.Generic.SmTcrExcl.succ_le X p A).trans (le_of_eq ?_)
+  unfold smTcrExclBound
+  have hN : (0 : ℝ) ≤ ((q₂ : ℝ) + 1) / Fintype.card N := by positivity
+  have hP : (0 : ℝ) ≤ (q₁ : ℝ) / Fintype.card P := by positivity
+  have hNc : (0 : ℝ) < Fintype.card N := Nat.cast_pos.mpr Fintype.card_pos
+  have hPc : (0 : ℝ) < Fintype.card P := Nat.cast_pos.mpr Fintype.card_pos
+  rw [ENNReal.ofReal_add hN hP, ENNReal.ofReal_div_of_pos hNc, ENNReal.ofReal_div_of_pos hPc,
+    ENNReal.ofReal_add (Nat.cast_nonneg q₂) zero_le_one, ENNReal.ofReal_natCast,
+    ENNReal.ofReal_one, ENNReal.ofReal_natCast, ENNReal.ofReal_natCast, ENNReal.ofReal_natCast]
+
+/-- The classical SM-rTCR row of Table 6 is **Corollary G.1**
+(`Notions.Generic.RandomSamplingTCR.advantage_le`). -/
+theorem smRtcrBound_corollaryG1 {P T M R N : Type} [DecidableEq P] [DecidableEq T] [DecidableEq M]
+    [DecidableEq R] [DecidableEq N] [SampleableType P] [SampleableType R] [SampleableType N]
+    [Fintype N] [Fintype R]
+    (prop : N → Bool) (K : ℕ) {q p : ℕ}
+    (A : Notions.Generic.RandomSamplingTCR.Adversary P T M R N q p) :
+    Notions.Generic.RandomSamplingTCR.advantage prop K A ≤
+      ENNReal.ofReal (smRtcrBound (Fintype.card N) (Fintype.card R) K p q) := by
+  refine (Notions.Generic.RandomSamplingTCR.advantage_le prop K A).trans (le_of_eq ?_)
+  unfold smRtcrBound smRtcrHash smRtcrRand
+  have hhalf : ((K * (K - 1) / 2 : ℕ) : ℝ) = (K : ℝ) * ((K : ℝ) - 1) / 2 := by
+    rcases K with _ | k
+    · simp
+    · have hev : 2 ∣ (k + 1) * k := by
+        rcases Nat.even_or_odd k with ⟨m, rfl⟩ | ⟨m, rfl⟩
+        · exact ⟨(m + m + 1) * m, by ring⟩
+        · exact ⟨(m + 1) * (2 * m + 1), by ring⟩
+      rw [Nat.add_sub_cancel, Nat.cast_div hev (by norm_num)]
+      push_cast
+      ring
+  have hnum : ((K * q + p * (K * (K - 1) / 2) : ℕ) : ℝ) =
+      (K : ℝ) * q + p * K * (K - 1) / 2 := by
+    push_cast [hhalf]
+    ring
+  have h1 : (0 : ℝ) ≤ ((q : ℝ) + 1) / Fintype.card N := by positivity
+  have h2 : (0 : ℝ) ≤ ((K : ℝ) * q + p * K * (K - 1) / 2) / Fintype.card R := by
+    rw [← hnum]
+    positivity
+  have hNc : (0 : ℝ) < Fintype.card N := Nat.cast_pos.mpr Fintype.card_pos
+  have hRc : (0 : ℝ) < Fintype.card R := Nat.cast_pos.mpr Fintype.card_pos
+  rw [ENNReal.ofReal_add h1 h2, ENNReal.ofReal_div_of_pos hNc, ENNReal.ofReal_div_of_pos hRc,
+    ← hnum, ENNReal.ofReal_add (Nat.cast_nonneg q) zero_le_one, ENNReal.ofReal_natCast,
+    ENNReal.ofReal_one, ENNReal.ofReal_natCast, ENNReal.ofReal_natCast, ENNReal.ofReal_natCast]
+
+/-- The classical DI-Repro row of Table 7 is **Corollary C.2** (`Repro.diAdvantage_le`). -/
+theorem diReproBound_corollaryC2 {X₁ X₂ Y : Type} [Fintype X₁] [DecidableEq X₁] [SampleableType X₁]
+    [Fintype X₂] [DecidableEq X₂] [SampleableType Y] {q R : ℕ}
+    (A : Repro.DIAdversary X₁ X₂ Y q R) :
+    Repro.diAdvantage A ≤ diReproBound (Fintype.card X₁) q :=
+  Repro.diAdvantage_le A
+
+/-- The classical ITSR row of Table 6 is **Theorem 2** of `ITSR-Classical.pdf`
+(`ITSR.advantage_le_mainBound`) at `K = Fin (2^lK)` and `ι = Fin (2^h)`. -/
+theorem itsrBound_theorem2 {M : Type} [DecidableEq M] {h k t p lK q : ℕ} [NeZero t]
+    (A : ITSR.Adversary (Fin (2 ^ lK)) M (ITSR.Digest (Fin (2 ^ h)) k t) q p) :
+    ITSR.advantage A ≤ ENNReal.ofReal (itsrBound h k t p (2 ^ lK) q) := by
+  have h := ITSR.advantage_le_mainBound A
+  rw [ITSR.Concrete.theta_fin_two_pow, Fintype.card_fin] at h
+  exact h
+
+/-- The classical Theorem F.2 row of Remark 6.1 is `ITSR.advantage_le_theoremF2` at
+`K = Fin (2^lK)` and `ι = Fin (2^h)`. -/
+theorem itsrBoundF2_theoremF2 {M : Type} [DecidableEq M] {h k t p lK q : ℕ} [NeZero t]
+    (A : ITSR.Adversary (Fin (2 ^ lK)) M (ITSR.Digest (Fin (2 ^ h)) k t) q p) :
+    ITSR.advantage A ≤ ENNReal.ofReal (itsrBoundF2 h k t p (2 ^ lK) q) := by
+  have h := ITSR.advantage_le_theoremF2 A
+  rw [ITSR.Concrete.theta_fin_two_pow, Fintype.card_fin] at h
+  simpa only [itsrBoundF2, ITSR.searchTerm] using h
+
+end GameLinks
 
 end ShrincsSecurity.Concrete
 

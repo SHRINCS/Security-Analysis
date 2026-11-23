@@ -48,8 +48,8 @@ definitional.
 * **SM-UD** (Definition 4.6): `TweakableHash.SM_DT_UD_Experiment` with uniform inputs and outputs
   (`SM_DT_UD_Problem.HasUniformInputs`, `HasUniformOutputs`, both built in by `smUdProblem`). The
   paper's branch `b = 0` is `.real`, `b = 1` is `.ideal`, and the *absolute* advantage of
-  Definition 4.6 is VCVio's `boolDist` (`smUdAdv_toReal`). (The undetectability companion paper
-  prints a signed advantage; we follow the main paper.)
+  Definition 4.6 is VCVio's `boolDist` (`smUdAdv_toReal`), matching both the main paper and the
+  undetectability companion paper (Definition 4).
 * **SM-rTCR** (Definition 4.9): `TweakableHash.SM_DT_RTCR_Experiment`. `numRetries` is the
   sampling budget `K`, `prop` the predicate `Prop`; the public parameter is given at the start and
   there is no collection oracle (as in the paper). An exhausted challenge records `(T, m, ⊥)`,

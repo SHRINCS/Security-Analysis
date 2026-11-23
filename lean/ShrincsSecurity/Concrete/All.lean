@@ -10,8 +10,8 @@ public import ShrincsSecurity.Concrete.ConventionM
 /-!
 # Section 6: concrete classical security of the proposed parameters
 
-Umbrella module for `ShrincsSecurity.Concrete` (main paper, Section 6, classical columns; the
-quantum columns are out of scope).
+Umbrella module for `ShrincsSecurity.Concrete` (main paper, Section 6, classical columns; see
+`ShrincsSecurity.Concrete.Quantum.All` for the quantum columns).
 
 | Paper | Lean |
 |---|---|

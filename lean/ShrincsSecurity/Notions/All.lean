@@ -14,6 +14,7 @@ public import ShrincsSecurity.Notions.Generic.HiddenSlice
 public import ShrincsSecurity.Notions.Generic.ExclusiveTweaks
 public import ShrincsSecurity.Notions.Generic.RandomSamplingTCR
 public import ShrincsSecurity.Notions.Generic.CollectionLemma
+public import ShrincsSecurity.Notions.Generic.IndependentFunctions
 
 /-!
 # Security notions of the main paper, Sections 4.2–4.5, and their classical generic bounds
@@ -47,6 +48,7 @@ The classical random-oracle generic bounds (Appendices C, D, E, G) are in
 | Def. C.4, Lemma C.7 | `Generic.ZeroDist.advantage_le` |
 | Lemma C.9 (classical) | `Generic.HiddenSlice.abs_game_sub_le`, `abs_game_sub_eq_advantage` |
 | Lemma 4.1 (i) (classical, ideal collection) | `Generic.CollectionLemma.prEvent_game0_collInterface_le`, SM-TCR instance `prEvent_smtcrCollGame_le` |
-| Thm. E.1 (classical) | `Generic.SmTcrExcl.succ_le`, `succ_le_of_le` |
+| Lemma 4.2 (classical, independent functions) | `Generic.IndependentFunctions.gameExt_eq_game_dropExt`, `smtcrGameExt_eq`, `diAdvantageExt_eq` |
+| Thm. E.1 (classical) | `Generic.SmTcrExcl.succ_le`, `succ_le_of_le_each`, `succ_le_of_le` |
 | Cor. G.1 | `Generic.RandomSamplingTCR.advantage_le`, `advantage_le_of_one` |
 -/

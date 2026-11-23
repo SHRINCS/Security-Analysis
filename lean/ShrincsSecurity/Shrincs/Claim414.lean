@@ -299,6 +299,108 @@ theorem claim_4_14 {qs qh₁ qh₂ L : ℕ} (A : Forger pr Msg enc qs qh₁ qh�
   rw [← h2, h0, h1, B1S, Repro.diAdvantage]
   exact Fxmss.Rom.Claim42.le_add_ofReal_abs (prEvent_ne_top _) (prEvent_ne_top _)
 
+/-! ## `B₁⁺` with Corollary C.3: only the forger's own `H_msg^sf` queries count -/
+
+namespace Claim414
+
+variable {pr Msg enc}
+
+open Fxmss.Rom.Claim42 (pot pot_mono pot_true pot_hash forge_pot_le completion_pot_le
+  lazy_implB_ro mem_support_nested_bind)
+
+omit [Fintype pr.PkSeed] [Fintype pr.Digest] [DecidableEq pr.Digest] [Inhabited pr.Digest]
+  [Fintype Msg] [Fintype pr.Y] in
+/-- **The augmented signing phase charges only the forger's queries**: along every execution of
+`B₁⁺`'s signing phase in the lazy `DI-Repro_b`, the final `q_pre` is at most the initial potential
+plus `q_{h,2}`. -/
+theorem progS_count_le (b : Bool) {qs qh₁ qh₂ L : ℕ} (A : Forger pr Msg enc qs qh₁ qh₂ L)
+    (st : A.State) (K : Keys pr) (sk : LeafId → ℕ → pr.Y) (ls : LS pr (BMsg pr Msg))
+    (bs : St pr (BMsg pr Msg)) :
+    ∀ z ∈ support ((simulateQ (Repro.lazyDIImpl b) ((simulateQ (implB pr (BMsg pr Msg) K sk)
+      (progS pr Msg enc A.toShrincsAdversary st K)).run bs)).run ls),
+      z.2.count ≤ pot (fun _ => True) ls + qh₂ := by
+  intro z hz
+  unfold progS at hz
+  obtain ⟨w₁, hw₁, hz⟩ := mem_support_nested_bind _ _ _ _ ls bs hz
+  obtain ⟨w₂, hw₂, hz⟩ := mem_support_nested_bind _ _ _ _ _ _ hz
+  obtain ⟨w₃, hw₃, hz⟩ := mem_support_nested_bind _ _ _ _ _ _ hz
+  simp only [simulateQ_pure, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hz
+  subst hz
+  have h₁ := forge_pot_le b K sk _ (forgeExt_roBound pr Msg enc A st K.S K.toPK) ls bs w₁ hw₁
+  simp only [simulateQ_spec_query] at hw₂
+  obtain ⟨v, hv, he⟩ := lazy_implB_ro b K sk _ w₁.2 w₁.1.2 w₂ hw₂
+  have h₂ : pot (fun x => x ≠ (K.pk, K.pkSf, Fxmss.Rom.toIdx w₁.1.1.1.2.1, w₁.1.1.1.1)) v.2 =
+      pot (fun x => x ≠ (K.pk, K.pkSf, Fxmss.Rom.toIdx w₁.1.1.1.2.1, w₁.1.1.1.1)) w₁.2 := by
+    rw [pot_hash _ _ w₁.2 v hv]
+    simp [Fxmss.Rom.roIn]
+  have h₃ := completion_pot_le b
+    (fun x => x ≠ (K.pk, K.pkSf, Fxmss.Rom.toIdx w₁.1.1.1.2.1, w₁.1.1.1.1)) K sk
+    (otherMsg (BMsg pr Msg) w₁.1.1.1.1)
+    (fun id h => Fxmss.Rom.otherMsg_ne (BMsg pr Msg) w₁.1.1.1.1
+      (congrArg (fun x : X2 pr (BMsg pr Msg) => x.2.2.2) h))
+    (anchorList vp.params K.S) w₂.2 w₂.1.2 w₃ hw₃
+  have h₄ := pot_mono
+    (fun x (_ : x ≠ (K.pk, K.pkSf, Fxmss.Rom.toIdx w₁.1.1.1.2.1, w₁.1.1.1.1)) => trivial) w₁.2
+  rw [he] at h₃
+  have h₅ : w₃.2.count ≤
+      pot (fun x => x ≠ (K.pk, K.pkSf, Fxmss.Rom.toIdx w₁.1.1.1.2.1, w₁.1.1.1.1)) w₃.2 :=
+    Nat.le_add_right _ _
+  show w₃.2.count ≤ _
+  omega
+
+set_option linter.unusedSectionVars false in
+/-- **`q_pre ≤ q_{h,1} + q_{h,2}`** on every execution of `B₁⁺` in the lazy `DI-Repro_b`. -/
+theorem B1S_count_le (b : Bool) {qs qh₁ qh₂ L : ℕ} (A : Forger pr Msg enc qs qh₁ qh₂ L) :
+    ∀ z ∈ support ((simulateQ (Repro.lazyDIImpl b) (B1S pr Msg enc A).run).run
+      Repro.LazyState.init), z.2.count ≤ qh₁ + qh₂ := by
+  have hl : ∀ {β : Type} (oa : ProbComp β) (s : LS pr (BMsg pr Msg)),
+      (simulateQ (Repro.lazyDIImpl b)
+        (liftM oa : OracleComp (DSpec pr (BMsg pr Msg)) β)).run s =
+        (fun x => (x, s)) <$> oa := fun oa s => Fxmss.simulateQ_add_liftM_run _ oa s
+  intro z hz
+  change z ∈ support ((simulateQ (Repro.lazyDIImpl b)
+    (B1Srun pr Msg enc A.toShrincsAdversary)).run Repro.LazyState.init) at hz
+  unfold B1Srun at hz
+  simp only [simulateQ_bind, StateT.run_bind, hl, bind_map_left, mem_support_bind_iff] at hz
+  obtain ⟨pk, -, p₁, hp₁, hz⟩ := hz
+  have h₁ := Repro.count_add_pend_le b _ qh₁ (fwd_hashBound A) _ p₁ hp₁
+  have h₀ : Repro.pendQ (Repro.LazyState.init : LS pr (BMsg pr Msg)) = 0 := by
+    simp [Repro.pendQ, Repro.LazyState.init]
+  rw [h₀] at h₁
+  simp only [Repro.LazyState.init, zero_add] at h₁
+  unfold B1Scont at hz
+  by_cases hv : p₁.1.1.TreeValid vp.params.hsf
+  swap
+  · rw [ite_eq_left hv] at hz
+    simp only [simulateQ_pure, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hz
+    subst hz
+    show p₁.2.count ≤ _
+    omega
+  rw [ite_eq_right (not_not.2 hv)] at hz
+  simp only [simulateQ_bind, StateT.run_bind, hl, bind_map_left, mem_support_bind_iff,
+    simulateQ_pure, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hz
+  obtain ⟨f, -, pkSl, -, w, hw, rfl⟩ := hz
+  have h₂ := progS_count_le b A _ _ _ _ _ w hw
+  rw [pot_true] at h₂
+  show w.2.count ≤ _
+  omega
+
+end Claim414
+
+set_option linter.unusedSectionVars false in
+/-- **Claim 4.14 with Corollary C.3** (the paper's figure): the augmented distinguisher `B₁⁺` has
+advantage at most `(q_{h,1} + q_{h,2}) / |Y|` against `DI-Repro`; only the forger's own queries to
+`H_msg^sf` count, not `B₁⁺`'s read-back or verification queries. -/
+theorem B1S_diAdvantage_le {qs qh₁ qh₂ L : ℕ} (A : Forger pr Msg enc qs qh₁ qh₂ L) :
+    ENNReal.ofReal (Repro.diAdvantage (B1S pr Msg enc A)) ≤
+      ((qh₁ + qh₂ : ℕ) : ℝ≥0∞) / Fintype.card pr.Y := by
+  refine (Repro.diAdvantage_le_expectedPre _ false).trans (ENNReal.div_le_div_right ?_ _)
+  rw [Repro.expectedPre_eq_lazy]
+  refine Repro.expect_le_of_forall _ _ fun n hn => ?_
+  simp only [support_map, Set.mem_image] at hn
+  obtain ⟨z, hz, rfl⟩ := hn
+  exact Claim414.B1S_count_le false A z hz
+
 end ShrincsSecurity.Shrincs
 
 end
