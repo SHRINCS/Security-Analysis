@@ -163,17 +163,20 @@ document's `2^-h`; `Concrete.theta_fin_two_pow`).
 
 ### 4.3 Generic bounds (Appendices C–G)
 
-- **Lemma 4.1 (i). Route; partial scope.** It is proved as
-  `Pr[collection game] ≤ Pr[stand-alone game](A′) + 2q/|P|`
-  (`CollectionLemma.prEvent_game0_collInterface_le`), for any property satisfying `Discipline`,
-  with `q` the first-stage evaluations, which is the document's `ξ`. Two scope limits apply:
-  - The document's Step 3 is replaced by a second application of Lemma C.9, so `standAlone` removes
-    the collection oracle `CollSpec` while **retaining the full collection `P × (T × X) → N` in the
-    direct random oracle `ROSpec`** (rather than reducing to a single member oracle `Th_m` alone).
-  - `Discipline.impl_support` requires challenge refusal to depend only on the challenge state and
-    query before querying the slice, which **excludes `S-TCR(Prop)`** (whose refusal depends on
-    whether the random slice has a valid counter). Only `SM-TCR` is instantiated (`smtcr_discipline`).
-    For advantage notions (SM-UD, SM-DSPR) this route would give `4q/|P|`; those instances are not
+- **Lemma 4.1 (i). Route; scope.** Proved as
+  `Pr[collection game] ≤ Pr[stand-alone game](A′) + 2q/|P|` for any property satisfying
+  `Discipline`, with `q` the first-stage evaluations (the document's `ξ`):
+  - `CollectionLemma.prEvent_game0_collInterface_le` removes `CollSpec` (Steps 1–2 of Appendix D.2),
+    and `IndependentFunctions.prEvent_game0_collInterface_singleMember_le` completes Step 3 for
+    collections `T × (M ⊕ Rest)` by splitting off and simulating the other members `Rest` via
+    `IndependentFunctions.singleMemberStandAlone`, leaving a stand-alone adversary over the single
+    member `ROSpec P (T × M) N` alone.
+  - Instantiated for both **SM-TCR** (`smtcr_discipline`, `prEvent_smtcrCollGame_le`,
+    `prEvent_smtcrCollGame_singleMember_le`) and **bounded `S-TCR(Prop)`** with counter cap `B`
+    (`stcr_discipline`, `prEvent_stcrCollGame_le`, `prEvent_stcrCollGame_singleMember_le`, where a
+    non-refused search over `Fin B` that finds no valid counter reserves its tweak `T` and returns
+    `some none` rather than refusing with `none`).
+  - For advantage notions (SM-UD, SM-DSPR) this route would give `4q/|P|`; those instances are not
     formalised.
 - **Lemma 4.2. Choice.** Classical only. "Time" is query bounds on the game's oracles. The
   simulated adversary uses only private coins, which are unbounded in every game.

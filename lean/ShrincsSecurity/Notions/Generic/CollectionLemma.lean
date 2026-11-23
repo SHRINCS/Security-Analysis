@@ -24,14 +24,17 @@ its challenge oracle and `Φ` its winning condition, both evaluating the hidden 
 the tweaks a challenge reserves (`chalRes`: its tweak, and for sm-tcr-excl also the partner
 `ω(T)`), the challenge oracle's own refusal test, and the refusal answer `⊥`. The `Discipline`
 hypotheses hold for the properties of Definition 4.12 whose challenge refusal depends only on the
-challenge state and query (such as SM-TCR, SM-PRE, SM-UD, SM-DSPR, SM-TCR-EXCL; `S-TCR(Prop)` is
-excluded because refusal due to no valid counter depends on the random slice values): a refused
-challenge is answered `⊥` without effect; an accepted one evaluates the slice only at the tweaks it
-reserves and reserves exactly those; `Φ` evaluates the slice only at reserved tweaks.
+challenge state and query (such as SM-TCR, SM-PRE, SM-UD, SM-DSPR, SM-TCR-EXCL, and bounded
+`S-TCR(Prop)` where a search over `Fin B` that exhausts all `B` counters still reserves its tweak
+`T` and returns `some none` rather than refusing with `none`): a refused challenge is answered `⊥`
+without effect; an accepted one evaluates the slice only at the tweaks it reserves and reserves
+exactly those; `Φ` evaluates the slice only at reserved tweaks.
 
 Note: `standAlone` removes the collection oracle `CollSpec`, while retaining the full collection
-oracle `ROSpec P (T × X) N` in the adversary's direct evaluations (Step 3 of Appendix D.2 is
-replaced by a second use of Lemma C.9 rather than simulating the other members locally).
+oracle `ROSpec P (T × X) N` in the adversary's direct evaluations. Step 3 of Appendix D.2 (splitting
+the remaining direct evaluations into the single member `Th_m` plus locally simulated independent
+members `Rest`, when `X = M ⊕ Rest`) is completed in `IndependentFunctions.singleMemberStandAlone`
+and `IndependentFunctions.prEvent_game0_collInterface_singleMember_le`.
 
 The collection experiment (`collInterface`, Definition 4.12) adds the collection oracle to `Σ`
 and enforces the reservation rule in both orders: a challenge is refused if a tweak it would
@@ -47,6 +50,8 @@ reserve was used by a collection query; a collection query is refused at a reser
   is a collection adversary (`liftAdv`) with the same success probability.
 * `prEvent_smtcrCollGame_le`, `prEvent_smtcrGame_eq`: both directions for SM-TCR of a member
   (Definition D.1), via `smtcr_discipline`.
+* `prEvent_stcrCollGame_le`, `prEvent_stcrGame_eq`: both directions for bounded `S-TCR(Prop)` of a
+  member (Definition 4.8 with counter bound `B`, e.g. `B = 2^c`), via `stcr_discipline`.
 
 ## Proof
 
@@ -995,6 +1000,235 @@ theorem prEvent_smtcrGame_eq (emb : M → X) (p : ℕ)
   prEvent_game0_liftAdv _ _ B
 
 end smtcr
+
+/-! ## Bounded `S-TCR(Prop)` of a member of the collection, in the random-oracle model -/
+
+section stcr
+
+variable {P T X M N : Type} [DecidableEq P] [DecidableEq T] [DecidableEq X] [DecidableEq N]
+  [SampleableType N]
+
+/-- The challenge oracle `O_Prop(·, ·)` of bounded `S-TCR(Prop)` with counter bound `B`
+(in SHRINCS, `B = 2^c`):
+* `none` = refused by the target cap or tweak-reservation check (no slice queries, tweak not
+  reserved);
+* `some none` = accepted and searched all `i < B` without finding `Prop(Th(P', T, m ∥ i)) = true`
+  (tweak `T` is reserved so subsequent collection queries cannot observe an independent slice);
+* `some (some (y, ctr))` = accepted and returned the least `ctr : Fin B` with
+  `Prop(y) = true` where `y = Th(P', T, m ∥ ctr)` (tweak `T` is reserved). -/
+abbrev STCRSpec (T M N : Type) (B : ℕ) : OracleSpec (T × M) :=
+  (T × M) →ₒ Option (Option (N × Fin B))
+
+/-- Recorded challenge state for bounded `S-TCR(Prop)`: each accepted query reserves its tweak `T`,
+and stores `some (m, ctr)` when a valid counter `< B` was found (`none` on search exhaustion). -/
+abbrev STCRHistory (T M : Type) (B : ℕ) : Type := List (T × Option (M × Fin B))
+
+/-- Refusal test of bounded `S-TCR(Prop)`: `|Q| ≥ p`, or the tweak was already reserved. -/
+def stcrRefused {B : ℕ} (p : ℕ) (Q : STCRHistory T M B) (d : T × M) : Bool :=
+  decide (p ≤ Q.length) || Q.any fun e => decide (e.1 = d.1)
+
+/-- Linearly search counters `i, i + 1, …, B - 1` on the hidden slice for the least counter
+satisfying `prop`. -/
+def stcrSearchAux {B : ℕ} (emb : M × Fin B → X) (prop : N → Bool) (t : T) (m : M) :
+    ∀ (i rem : ℕ), i + rem = B →
+      OracleComp (unifSpec + SliceSpec (T × X) N) (Option (N × Fin B))
+  | _, 0, _ => pure none
+  | i, rem + 1, h =>
+      let ctr : Fin B := ⟨i, by omega⟩
+      sliceQuery (t, emb (m, ctr)) >>= fun y =>
+        if prop y then pure (some (y, ctr))
+        else stcrSearchAux emb prop t m (i + 1) rem (by omega)
+
+/-- Search `0, 1, …, B - 1` on the hidden slice for the least counter satisfying `prop`. -/
+def stcrSearch {B : ℕ} (emb : M × Fin B → X) (prop : N → Bool) (t : T) (m : M) :
+    OracleComp (unifSpec + SliceSpec (T × X) N) (Option (N × Fin B)) :=
+  stcrSearchAux emb prop t m 0 B (Nat.zero_add B)
+
+omit [DecidableEq P] [DecidableEq X] [DecidableEq N] [SampleableType N] in
+private theorem allQueriesSatisfy_stcrSearchAux {B : ℕ} (emb : M × Fin B → X) (prop : N → Bool)
+    (t : T) (m : M) :
+    ∀ (i rem : ℕ) (h : i + rem = B),
+      (stcrSearchAux (N := N) emb prop t m i rem h).AllQueriesSatisfy
+        (SliceIn fun x : T × X => decide (t = x.1))
+  | _, 0, _ => allQueriesSatisfy_pure _ _
+  | i, rem + 1, h => by
+      unfold stcrSearchAux
+      refine allQueriesSatisfy_bind ((allQueriesSatisfy_query_iff _ _).2 (by simp [SliceIn]))
+        fun y => ?_
+      split_ifs
+      · exact allQueriesSatisfy_pure _ _
+      · exact allQueriesSatisfy_stcrSearchAux emb prop t m (i + 1) rem (by omega)
+
+/-- Under a fixed slice oracle `f : T × X → N`, `stcrSearchAux` finds the least counter `≥ i`
+with `prop (f (t, emb (m, ctr))) = true`, or `none` if none exists. -/
+def fixedSliceImpl {D N : Type} (f : D → N) :
+    QueryImpl (unifSpec + SliceSpec D N) ProbComp :=
+  QueryImpl.ofLift unifSpec ProbComp + (fun d => pure (f d) : QueryImpl (SliceSpec D N) ProbComp)
+
+omit [DecidableEq P] [DecidableEq T] [DecidableEq X] [DecidableEq N] [SampleableType N] in
+theorem simulateQ_stcrSearchAux_fixedSlice {B : ℕ} (emb : M × Fin B → X) (prop : N → Bool)
+    (f : T × X → N) (t : T) (m : M) :
+    ∀ (i rem : ℕ) (h : i + rem = B),
+      (∀ (ctr : Fin B), i ≤ ctr.val →
+        prop (f (t, emb (m, ctr))) = true →
+        (∀ ctr' : Fin B, i ≤ ctr'.val → ctr'.val < ctr.val →
+          prop (f (t, emb (m, ctr'))) = false) →
+        simulateQ (fixedSliceImpl f) (stcrSearchAux emb prop t m i rem h) =
+          pure (some (f (t, emb (m, ctr)), ctr))) ∧
+      ((∀ ctr : Fin B, i ≤ ctr.val → prop (f (t, emb (m, ctr))) = false) →
+        simulateQ (fixedSliceImpl f) (stcrSearchAux emb prop t m i rem h) = pure none)
+  | i, 0, h =>
+      ⟨fun ctr hge => by omega, fun _ => by simp [stcrSearchAux]⟩
+  | i, rem + 1, h => by
+      have ih := simulateQ_stcrSearchAux_fixedSlice emb prop f t m (i + 1) rem (by omega)
+      have hstep :
+          simulateQ (fixedSliceImpl f) (stcrSearchAux emb prop t m i (rem + 1) h) =
+            if prop (f (t, emb (m, ⟨i, by omega⟩))) then
+              pure (some (f (t, emb (m, ⟨i, by omega⟩)), ⟨i, by omega⟩))
+            else simulateQ (fixedSliceImpl f) (stcrSearchAux emb prop t m (i + 1) rem (by omega)) := by
+        rw [stcrSearchAux, simulateQ_bind, simulateQ_spec_query]
+        change pure (f (t, emb (m, ⟨i, by omega⟩))) >>= _ = _
+        rw [pure_bind]
+        split_ifs
+        · exact simulateQ_pure _ _
+        · rfl
+      constructor
+      · intro ctr hge htrue hmin
+        rw [hstep]
+        by_cases heq : ctr.val = i
+        · have hctr : ctr = ⟨i, by omega⟩ := Fin.ext heq
+          rw [← hctr]
+          simp [htrue]
+        · have hgt : i < ctr.val := by omega
+          have hfalse : prop (f (t, emb (m, ⟨i, by omega⟩))) = false :=
+            hmin ⟨i, by omega⟩ le_rfl hgt
+          simp only [hfalse, Bool.false_eq_true, ↓reduceIte]
+          exact ih.1 ctr (by omega) htrue fun ctr' h1 h2 => hmin ctr' (by omega) h2
+      · intro hall
+        rw [hstep]
+        have hfalse : prop (f (t, emb (m, ⟨i, by omega⟩))) = false := hall ⟨i, by omega⟩ le_rfl
+        simp only [hfalse, Bool.false_eq_true, ↓reduceIte]
+        exact ih.2 fun ctr hge => hall ctr (by omega)
+
+/-- The challenge oracle `O_Prop(T, m)` of bounded `S-TCR(Prop)` on the hidden slice. -/
+def stcrChal {B : ℕ} (emb : M × Fin B → X) (prop : N → Bool) (p : ℕ) (d : T × M) :
+    StateT (STCRHistory T M B) (OracleComp (unifSpec + SliceSpec (T × X) N))
+      (Option (Option (N × Fin B))) :=
+  StateT.mk fun Q => if stcrRefused p Q d then pure (none, Q)
+    else (fun res => (some res, Q ++ [(d.1, res.map fun r => (d.2, r.2))])) <$>
+      stcrSearch emb prop d.1 d.2
+
+/-- The winning condition of bounded `S-TCR(Prop)`: on `(j, (m*, ctr*))`, if `Q[j]` recorded a
+valid target `(T_j, some (m_j, ctr_j))`, win iff `m* ≠ m_j` and
+`Th(P', T_j, m_j ∥ ctr_j) = Th(P', T_j, m* ∥ ctr*)`. Search-exhausted entries (`none`) cannot win. -/
+def stcrPred {B : ℕ} (emb : M × Fin B → X) [DecidableEq M]
+    (Q : STCRHistory T M B) (out : ℕ × M × Fin B) :
+    OracleComp (unifSpec + SliceSpec (T × X) N) Bool :=
+  match Q[out.1]? with
+  | none => pure false
+  | some (_, none) => pure false
+  | some (tj, some (mj, ctrj)) =>
+      if out.2.1 = mj then pure false
+      else sliceQuery (tj, emb (mj, ctrj)) >>= fun y =>
+        (fun y' => decide (y = y')) <$> sliceQuery (tj, emb out.2)
+
+/-- **The stand-alone bounded `S-TCR(Prop)` experiment** of a member in the random-oracle model, as
+an interface of Lemma C.9. -/
+def stcrInterface {B : ℕ} (emb : M × Fin B → X) (prop : N → Bool) [DecidableEq M] (p : ℕ) :
+    Interface (T × X) N (STCRSpec T M N B) (STCRHistory T M B) (ℕ × M × Fin B) where
+  init := []
+  impl := stcrChal emb prop p
+  pred := stcrPred emb
+
+/-- The reservation data of bounded `S-TCR(Prop)`: every non-refused challenge `(T, m)` reserves
+`T` (including when the bounded search over `Fin B` finds no valid counter). -/
+def stcrReservation {B : ℕ} (p : ℕ) :
+    Reservation (STCRSpec T M N B) (STCRHistory T M B) T where
+  res Q t := Q.any fun e => decide (e.1 = t)
+  chalRes d t := decide (d.1 = t)
+  refused := stcrRefused p
+  refuse _ := none
+  accepted _ a := a.isSome
+
+omit [DecidableEq P] [DecidableEq X] [SampleableType N] in
+/-- Bounded `S-TCR(Prop)` obeys the reservation discipline. -/
+theorem stcr_discipline {B : ℕ} (emb : M × Fin B → X) (prop : N → Bool) [DecidableEq M] (p : ℕ) :
+    Discipline (stcrInterface (T := T) (N := N) emb prop p)
+      (stcrReservation (T := T) (M := M) (N := N) (B := B) p) where
+  accepted_refuse _ := rfl
+  run_of_refused Q d h := by
+    change (stcrChal emb prop p d).run Q = _
+    have h' : stcrRefused p Q d = true := h
+    rw [stcrChal, StateT.run_mk]
+    simp only [h', ↓reduceIte]
+    rfl
+  impl_queries Q d h := by
+    change ((stcrChal emb prop p d).run Q).AllQueriesSatisfy _
+    have h' : stcrRefused p Q d = false := h
+    rw [stcrChal, StateT.run_mk]
+    simp only [h', Bool.false_eq_true, ↓reduceIte]
+    rw [map_eq_bind_pure_comp]
+    exact allQueriesSatisfy_bind
+      (allQueriesSatisfy_stcrSearchAux emb prop d.1 d.2 0 B (Nat.zero_add B))
+      fun _ => allQueriesSatisfy_pure _ _
+  impl_support Q d h z hz := by
+    change z ∈ support ((stcrChal emb prop p d).run Q) at hz
+    have h' : stcrRefused p Q d = false := h
+    rw [stcrChal, StateT.run_mk] at hz
+    simp only [h', Bool.false_eq_true, ↓reduceIte, support_map] at hz
+    obtain ⟨res, -, rfl⟩ := hz
+    refine ⟨rfl, funext fun t => ?_⟩
+    simp [stcrReservation, List.any_append]
+  pred_queries Q out := by
+    change (stcrPred emb Q out).AllQueriesSatisfy _
+    unfold stcrPred
+    cases he : Q[out.1]? with
+    | none => exact allQueriesSatisfy_pure _ _
+    | some e =>
+      rcases e with ⟨tj, none | ⟨mj, ctrj⟩⟩
+      · exact allQueriesSatisfy_pure _ _
+      · dsimp only
+        have hres : (stcrReservation (N := N) (B := B) p).res Q tj = true :=
+          List.any_eq_true.2 ⟨(tj, some (mj, ctrj)), List.mem_of_getElem? he, by simp⟩
+        split_ifs
+        · exact allQueriesSatisfy_pure _ _
+        · refine allQueriesSatisfy_bind ((allQueriesSatisfy_query_iff _ _).2 hres) fun _ => ?_
+          rw [map_eq_bind_pure_comp]
+          exact allQueriesSatisfy_bind ((allQueriesSatisfy_query_iff _ _).2 hres)
+            fun _ => allQueriesSatisfy_pure _ _
+
+variable [SampleableType P] [DecidableEq M] {S : Type} {q B : ℕ}
+
+/-- The bounded `S-TCR(Prop)` collection experiment in the random-oracle model. -/
+abbrev stcrCollGame (emb : M × Fin B → X) (prop : N → Bool) (p : ℕ)
+    (A : Adversary P (T × X) N (STCRSpec T M N B + CollSpec T X N) S (ℕ × M × Fin B) q) :
+    ProbComp Bool :=
+  game0 (collInterface (stcrInterface emb prop p) (stcrReservation p)) A
+
+/-- The stand-alone bounded `S-TCR(Prop)` experiment in the random-oracle model. -/
+abbrev stcrGame (emb : M × Fin B → X) (prop : N → Bool) (p : ℕ)
+    (A : Adversary P (T × X) N (STCRSpec T M N B) S (ℕ × M × Fin B) q) :
+    ProbComp Bool :=
+  game0 (stcrInterface emb prop p) A
+
+/-- **Lemma 4.1 (i) for bounded `S-TCR(Prop)`**: the collection oracle costs at most `2q/|P|`,
+where `q` bounds the first stage's evaluations of `Th_λ`. -/
+theorem prEvent_stcrCollGame_le [Fintype P] (emb : M × Fin B → X) (prop : N → Bool) (p : ℕ)
+    (A : Adversary P (T × X) N (STCRSpec T M N B + CollSpec T X N) S (ℕ × M × Fin B) q) :
+    Pr{let b ← stcrCollGame emb prop p A}[b = true] ≤
+      Pr{let b ← stcrGame emb prop p (standAlone (stcrInterface emb prop p)
+        (stcrReservation p) A)}[b = true] + 2 * q / Fintype.card P :=
+  prEvent_game0_collInterface_le (stcr_discipline emb prop p) A
+
+/-- **Lemma 4.1, lower bound, for bounded `S-TCR(Prop)`**: every stand-alone adversary is a
+collection adversary with the same success probability. -/
+theorem prEvent_stcrGame_eq (emb : M × Fin B → X) (prop : N → Bool) (p : ℕ)
+    (A : Adversary P (T × X) N (STCRSpec T M N B) S (ℕ × M × Fin B) q) :
+    Pr{let b ← stcrGame emb prop p A}[b = true] =
+      Pr{let b ← stcrCollGame emb prop p (liftAdv A)}[b = true] :=
+  prEvent_game0_liftAdv _ _ A
+
+end stcr
 
 end CollectionLemma
 
