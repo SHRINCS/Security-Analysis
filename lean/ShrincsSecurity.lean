@@ -27,5 +27,9 @@ public import ShrincsSecurity.Undetectability.Quantum.ZeroDistAdaptive
 public import ShrincsSecurity.Undetectability.Quantum.ReproQrom
 public import ShrincsSecurity.Undetectability.Theorems.All
 public import ShrincsSecurity.Undetectability.Rest.All
+public import ShrincsSecurity.Slhdsa.Bridge
+public import ShrincsSecurity.Slhdsa.WotsHybrid
+public import ShrincsSecurity.Slhdsa.PostPrf
+public import ShrincsSecurity.Shrincs.Claim416
 public import ShrincsSecurity.Shrincs.Theorem41
 public import ShrincsSecurity.Concrete.Quantum.All

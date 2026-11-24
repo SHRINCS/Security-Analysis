@@ -7,6 +7,7 @@ public import ShrincsSecurity.Shrincs.Bridge2
 public import ShrincsSecurity.Shrincs.Claim413
 public import ShrincsSecurity.Shrincs.Claim414
 public import ShrincsSecurity.Shrincs.Claim415
+public import ShrincsSecurity.Shrincs.Claim416
 public import ShrincsSecurity.Shrincs.PrfMsgBound
 public import ShrincsSecurity.Shrincs.PrfBound
 
@@ -19,25 +20,23 @@ public import ShrincsSecurity.Shrincs.PrfBound
 (the reading of Assumption 4.1 of the formalisation of Theorem 4.2, see `Model.lean`), and
 Conjecture 3.1 (`GrindComplete`) is a hypothesis.
 
-## The single quoted assumption: `StatelessBound` (Claim 4.16)
+## Claim 4.16 (stateless route): proved unconditionally in `Claim416.lean`
 
-The paper does not prove the stateless route: Claim 4.16 applies the reductions of [HK22]
-(Theorem 4.3, quoted) to the extended games, and asserts that the stateless-branch forgeries of
-`GAME.5` have probability at most the ten summands of Theorem 4.3 other than its two PRF terms.
-`StatelessBound A ε_sl` states **exactly this assertion, for the given forger `A`**:
+In the paper, Claim 4.16 applies the reductions of [HK22] (Theorem 4.3, quoted) to the extended
+games, asserting that the stateless-branch forgeries of `GAME.5` (`gameHybS`) have probability at
+most the ten post-PRF summands of Theorem 4.3.
 
-`Pr_{GAME.5}[W_sl] ≤ ε_sl`,
-
-where `GAME.5`, for stateless-branch forgeries, is `GAME.4` (`gameHybS`, `Wrapper.lean`): the
-SHRINCS experiment with uniform secret elements on both paths (`GAME.1`), uniform randomizers
-cached per `PRF_msg` input (`GAME.2`), the digests of the stateful signatures fixed uniformly at
-setup and programmed into `H_msg^sf` (`GAME.4`), and `W_sl` the event that the forgery is fresh
-for the signing queries of both paths and verifies via the stateless branch (the aborts of
-`GAME.3` and `GAME.5` concern the stateful branch only, so `Pr_{GAME.5}[W_sl] = Pr_{GAME.4}[W_sl]`).
-The quantity `ε_sl` is the paper's sum of the ten [HK22] summands, kept abstract. Nothing else
-about the stateless path is assumed: `StatelessBound` is the only hypothesis of `theorem_4_1`
-besides Conjecture 3.1 (`hgc`) and the injectivity of the digit encoding `yToBytes` (`hinj`, the
-hypothesis of Claim 4.10 in Theorem 4.2).
+* `claim_4_16` (`Claim416.lean`) **proves Claim 4.16 directly** under
+  `hinj : Function.Injective pr.yToBytes` and `henc : enc.Injective`, discharging `StatelessBound`
+  with all ten explicit [HK22] post-PRF terms (ITSR for `H_msg^sl`, `w − 2` WOTS SM-UD terms,
+  WOTS SM-PRE, WOTS `F` SM-TCR, XMSS `H` SM-TCR, `Th_k` SM-TCR, `Th_{l_sl}` SM-TCR, FORS `H`
+  SM-TCR, `3 ·` FORS `F` SM-TCR, and FORS `F` SM-DSPR), via Stage-1 `O_coll` precomputation of the
+  stateful FXMSS subtree (`SfPrecomp`).
+* `theorem_4_1_full`, `theorem_4_1_full_of_ud_le`, and `corollary_4_1_full` plug
+  `claim_4_16` into Theorem 4.1, giving the **complete 21-term SHRINCS EU-CMA bound with
+  no `StatelessBound` hypothesis** (only `hinj`, `henc`, and Conjecture 3.1 `hgc`).
+* The abstract `StatelessBound` versions (`theorem_4_1`, `theorem_4_1_of_ud_le`, `corollary_4_1`)
+  are preserved for backwards compatibility.
 
 ## Statement
 
@@ -282,6 +281,181 @@ theorem corollary_4_1 (hinj : Function.Injective pr.yToBytes) (hgc : GrindComple
         ((qh₁ + qh₂ + 1 : ℕ) : ℝ≥0∞) / Fintype.card pr.Y := by ring
   rw [← hsum]
   gcongr
+
+/-- **Theorem 4.1 (full, with Claim 4.16 proved unconditionally)**: SHRINCS EU-CMA security
+in the classical ROM for `H_msg^sf`, under Conjecture 3.1 (`hgc`), digit-encoding injectivity
+(`hinj`), and message-encoding injectivity (`henc`), with **no `StatelessBound` hypothesis**.
+Combines the two PRF terms, SM-rTCR, DI-Repro, the seven stateful FXMSS collection terms
+(Claim 4.15), and all ten stateless SLH-DSA post-PRF terms (Claim 4.16). -/
+theorem theorem_4_1_full (hinj : Function.Injective pr.yToBytes) (henc : enc.Injective)
+    (hgc : GrindComplete pr) {qs qh₁ qh₂ L : ℕ} (A : Forger pr Msg enc qs qh₁ qh₂ L) :
+    succ pr Msg enc A.toShrincsAdversary ≤
+      Notions.prfAdv (Notions.KeyedHash.toPRF (prfF pr)) (BprfAdv pr Msg enc A) +
+      Notions.prfAdv (Notions.KeyedHash.toPRF (prfMsgF pr))
+        (BprfmsgAdv pr Msg enc A.toShrincsAdversary) +
+      Notions.Generic.RandomSamplingTCR.advantage (fun _ => true) 1
+        (Fxmss.Rom.B0 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
+      ENNReal.ofReal (Repro.diAdvantage (B1S pr Msg enc A)) +
+      Notions.STCR_Succ (B2S pr Msg enc A) +
+      ∑ γ ∈ Finset.range (vp.params.w - 2), SM_DT_UD_Advantage (B3S pr Msg enc γ A) +
+      SM_DT_TCR_Advantage (B4S pr Msg enc A) +
+      SM_DT_PRE_Advantage (B5S pr Msg enc A) +
+      SM_DT_TCR_Advantage (B6S pr Msg enc A) +
+      SM_DT_TCR_Advantage (B7S pr Msg enc A) +
+      Notions.SMTCRExcl_Succ (B8S pr Msg enc A) +
+      (Notions.itsrSucc (Slhdsa.slHmsg pr) (Slhdsa.slMap vp)
+          (Slhdsa.B_itsr pr (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+            (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) +
+        ∑ γ ∈ Finset.range (vp.params.w - 2),
+          SM_DT_UD_Advantage (Slhdsa.B_ud pr
+            (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+            (Slhdsa.wotsStage2 pr (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) γ) +
+        SM_DT_PRE_Advantage (Slhdsa.B_pre pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (Slhdsa.wotsStage2 pr (shrincsSlAdv pr Msg enc A.toShrincsAdversary))) +
+        SM_DT_TCR_Advantage (Slhdsa.B_tcrF_wots pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) +
+        SM_DT_TCR_Advantage (Slhdsa.B_tcrH_xmss pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) +
+        SM_DT_TCR_Advantage (Slhdsa.B_tcrThK pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) +
+        SM_DT_TCR_Advantage (Slhdsa.B_tcrThLsl pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) +
+        SM_DT_TCR_Advantage (Slhdsa.B_tcrH_fors pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) +
+        3 * SM_DT_TCR_Advantage (Slhdsa.B_tcrF_fors pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) +
+        SM_DT_DSPR_Advantage (Slhdsa.B_dsprF_fors pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (shrincsSlAdv pr Msg enc A.toShrincsAdversary))) :=
+  theorem_4_1 pr Msg enc hinj hgc A (claim_4_16 pr Msg enc hinj henc A.toShrincsAdversary)
+
+/-- **Theorem 4.1 (full, `w · InSec^{sm-ud}` form)**: with common bounds `ε_sf` and `ε_sl` on
+the `w − 2` stateful and stateless SM-UD hybrid advantages respectively, each sum is at most
+`w · ε_sf` and `w · ε_sl`, with no `StatelessBound` hypothesis. -/
+theorem theorem_4_1_full_of_ud_le (hinj : Function.Injective pr.yToBytes) (henc : enc.Injective)
+    (hgc : GrindComplete pr) {qs qh₁ qh₂ L : ℕ} (A : Forger pr Msg enc qs qh₁ qh₂ L)
+    {εsf εsl : ℝ≥0∞}
+    (hεsf : ∀ γ < vp.params.w - 2, SM_DT_UD_Advantage (B3S pr Msg enc γ A) ≤ εsf)
+    (hεsl : ∀ γ < vp.params.w - 2,
+      SM_DT_UD_Advantage (Slhdsa.B_ud pr
+        (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+        (Slhdsa.wotsStage2 pr (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) γ) ≤ εsl) :
+    succ pr Msg enc A.toShrincsAdversary ≤
+      Notions.prfAdv (Notions.KeyedHash.toPRF (prfF pr)) (BprfAdv pr Msg enc A) +
+      Notions.prfAdv (Notions.KeyedHash.toPRF (prfMsgF pr))
+        (BprfmsgAdv pr Msg enc A.toShrincsAdversary) +
+      Notions.Generic.RandomSamplingTCR.advantage (fun _ => true) 1
+        (Fxmss.Rom.B0 pr (BMsg pr Msg) (slKeygenS pr) (AF pr Msg enc A)) +
+      ENNReal.ofReal (Repro.diAdvantage (B1S pr Msg enc A)) +
+      Notions.STCR_Succ (B2S pr Msg enc A) +
+      vp.params.w * εsf +
+      SM_DT_TCR_Advantage (B4S pr Msg enc A) +
+      SM_DT_PRE_Advantage (B5S pr Msg enc A) +
+      SM_DT_TCR_Advantage (B6S pr Msg enc A) +
+      SM_DT_TCR_Advantage (B7S pr Msg enc A) +
+      Notions.SMTCRExcl_Succ (B8S pr Msg enc A) +
+      (Notions.itsrSucc (Slhdsa.slHmsg pr) (Slhdsa.slMap vp)
+          (Slhdsa.B_itsr pr (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+            (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) +
+        vp.params.w * εsl +
+        SM_DT_PRE_Advantage (Slhdsa.B_pre pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (Slhdsa.wotsStage2 pr (shrincsSlAdv pr Msg enc A.toShrincsAdversary))) +
+        SM_DT_TCR_Advantage (Slhdsa.B_tcrF_wots pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) +
+        SM_DT_TCR_Advantage (Slhdsa.B_tcrH_xmss pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) +
+        SM_DT_TCR_Advantage (Slhdsa.B_tcrThK pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) +
+        SM_DT_TCR_Advantage (Slhdsa.B_tcrThLsl pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) +
+        SM_DT_TCR_Advantage (Slhdsa.B_tcrH_fors pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) +
+        3 * SM_DT_TCR_Advantage (Slhdsa.B_tcrF_fors pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) +
+        SM_DT_DSPR_Advantage (Slhdsa.B_dsprF_fors pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (shrincsSlAdv pr Msg enc A.toShrincsAdversary))) := by
+  refine (theorem_4_1_full pr Msg enc hinj henc hgc A).trans ?_
+  gcongr
+  · calc ∑ γ ∈ Finset.range (vp.params.w - 2), SM_DT_UD_Advantage (B3S pr Msg enc γ A)
+        ≤ ∑ _γ ∈ Finset.range (vp.params.w - 2), εsf :=
+          Finset.sum_le_sum fun γ hγ => hεsf γ (Finset.mem_range.mp hγ)
+      _ = ((vp.params.w - 2 : ℕ) : ℝ≥0∞) * εsf := by simp
+      _ ≤ vp.params.w * εsf := by gcongr; exact_mod_cast Nat.sub_le _ _
+  · calc ∑ γ ∈ Finset.range (vp.params.w - 2),
+          SM_DT_UD_Advantage (Slhdsa.B_ud pr
+            (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+            (Slhdsa.wotsStage2 pr (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) γ)
+        ≤ ∑ _γ ∈ Finset.range (vp.params.w - 2), εsl :=
+          Finset.sum_le_sum fun γ hγ => hεsl γ (Finset.mem_range.mp hγ)
+      _ = ((vp.params.w - 2 : ℕ) : ℝ≥0∞) * εsl := by simp
+      _ ≤ vp.params.w * εsl := by gcongr; exact_mod_cast Nat.sub_le _ _
+
+/-- **Theorem 4.1 (full) with the generic random-oracle bounds** (Corollaries G.1 and C.2/C.3)
+and **no `StatelessBound` hypothesis**: replaces `B₀(A_F)` and `B₁⁺` by their classical ROM bounds
+and discharges Claim 4.16 with all ten explicit stateless post-PRF terms. -/
+theorem corollary_4_1_full (hinj : Function.Injective pr.yToBytes) (henc : enc.Injective)
+    (hgc : GrindComplete pr) {qs qh₁ qh₂ L : ℕ} (A : Forger pr Msg enc qs qh₁ qh₂ L) :
+    succ pr Msg enc A.toShrincsAdversary ≤
+      Notions.prfAdv (Notions.KeyedHash.toPRF (prfF pr)) (BprfAdv pr Msg enc A) +
+      Notions.prfAdv (Notions.KeyedHash.toPRF (prfMsgF pr))
+        (BprfmsgAdv pr Msg enc A.toShrincsAdversary) +
+      (((qh₁ + qh₂ + 1 : ℕ) : ℝ≥0∞) + 1) / Fintype.card pr.Digest +
+        ((qh₁ + qh₂ + 1 : ℕ) : ℝ≥0∞) / Fintype.card pr.Y +
+      ((qh₁ + qh₂ : ℕ) : ℝ≥0∞) / Fintype.card pr.Y +
+      Notions.STCR_Succ (B2S pr Msg enc A) +
+      ∑ γ ∈ Finset.range (vp.params.w - 2), SM_DT_UD_Advantage (B3S pr Msg enc γ A) +
+      SM_DT_TCR_Advantage (B4S pr Msg enc A) +
+      SM_DT_PRE_Advantage (B5S pr Msg enc A) +
+      SM_DT_TCR_Advantage (B6S pr Msg enc A) +
+      SM_DT_TCR_Advantage (B7S pr Msg enc A) +
+      Notions.SMTCRExcl_Succ (B8S pr Msg enc A) +
+      (Notions.itsrSucc (Slhdsa.slHmsg pr) (Slhdsa.slMap vp)
+          (Slhdsa.B_itsr pr (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+            (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) +
+        ∑ γ ∈ Finset.range (vp.params.w - 2),
+          SM_DT_UD_Advantage (Slhdsa.B_ud pr
+            (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+            (Slhdsa.wotsStage2 pr (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) γ) +
+        SM_DT_PRE_Advantage (Slhdsa.B_pre pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (Slhdsa.wotsStage2 pr (shrincsSlAdv pr Msg enc A.toShrincsAdversary))) +
+        SM_DT_TCR_Advantage (Slhdsa.B_tcrF_wots pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) +
+        SM_DT_TCR_Advantage (Slhdsa.B_tcrH_xmss pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) +
+        SM_DT_TCR_Advantage (Slhdsa.B_tcrThK pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) +
+        SM_DT_TCR_Advantage (Slhdsa.B_tcrThLsl pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) +
+        SM_DT_TCR_Advantage (Slhdsa.B_tcrH_fors pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) +
+        3 * SM_DT_TCR_Advantage (Slhdsa.B_tcrF_fors pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (shrincsSlAdv pr Msg enc A.toShrincsAdversary)) +
+        SM_DT_DSPR_Advantage (Slhdsa.B_dsprF_fors pr
+          (sfStageShrincs pr Msg enc A.toShrincsAdversary)
+          (shrincsSlAdv pr Msg enc A.toShrincsAdversary))) :=
+  corollary_4_1 pr Msg enc hinj hgc A (claim_4_16 pr Msg enc hinj henc A.toShrincsAdversary)
 
 end ShrincsSecurity.Shrincs
 

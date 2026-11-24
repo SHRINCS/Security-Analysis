@@ -42,7 +42,7 @@ Each departure is classified as one of:
 | M Lemmas C.6, C.7, C.9, Theorem E.1, Theorem F.2, Corollary G.1, Lemmas 4.1 (i), 4.2 (classical) | `Notions/Generic/`, `ITSR.advantage_le_theoremF2` | classical only; Lemma 4.1 (i) and Theorem F.2 scope caveats (§4.3) |
 | M Claim 4.10 | `Fxmss.HonestView.extraction`, `Fxmss.Rom.Honest.claim_4_10` | digest encoding injective (§4.4) |
 | M Theorem 4.2 (classical, ROM for `H_msg^sf`) | `Fxmss.Rom.theorem_4_2`, `theorem_4_2_of_ud_le`, `corollary_4_2` | Conjecture 3.1 (`GrindComplete`), digest encoding injective, `[Nontrivial Msg]`, static `(qh₁, qh₂)` split, no query/time bounds on `B₂–B₈` (§4.5) |
-| M Theorem 4.1 (classical) | `Shrincs.theorem_4_1`, `theorem_4_1_of_ud_le`, `corollary_4_1` | Conjecture 3.1, digest encoding injective, `[Nontrivial Msg]`, static `(qh₁, qh₂)` split, Stage-1 `O_coll` stateless precomputation in `B2S–B8S` (zero Stage-2 stateless `Th_λ` evaluations; stateful signing still runs in Stage 2, no query/time bounds, §4.6), **Claim 4.16 as `StatelessBound`** (§2) |
+| M Theorem 4.1 (classical) | `Shrincs.theorem_4_1_full`, `theorem_4_1_full_of_ud_le`, `corollary_4_1_full`, `Shrincs.claim_4_16` (plus backwards-compatible `StatelessBound` forms `theorem_4_1`, `theorem_4_1_of_ud_le`, `corollary_4_1`) | Conjecture 3.1, digest encoding injective (`yToBytes`), message encoding injective (`enc.Injective`), `[Nontrivial Msg]`, static `(qh₁, qh₂)` split, hedged stateless mode, Stage-1 `O_coll` precomputation in `B2S–B8S` and Claim 4.16 reductions (no query/time bounds on collection reductions, §4.6) |
 | M Lemma 5.1 (verification query counts) | `Scheme.VerifyCount.*`, `Concrete.Vsf_bounds_fxmssVerify`, `Concrete.Vsl_bounds_slVerify` | stateful path proved on explicit-query `fxmssPkFromSigM` (`simulateQ_fxmssPkFromSigM = Fxmss.pkFromSig`); stateless path proved on `SLHDSA.GeneralScheme.verifyInternalM` (`shrincs_verify_stateless_eq_simulateQ = Shrincs.verify`) (§4.7) |
 | M §6 classical and quantum figures | `Concrete/`, `Concrete/Quantum/` | evaluation of Table 6/7 sums; the SM-DSPR row is the document's conjecture (§2, §4.7) |
 | M Lemma C.8 (quantum ZeroDist) | `Undetectability.ZeroDist.Adaptive.advantage_le_of_lossless` | the document's halting assumption (Remark C.1); stage 2 as effect (§5.2) |
@@ -57,7 +57,7 @@ Each of these is an explicit hypothesis of the theorems that use it.
 
 | Result | What the document says | Lean |
 |---|---|---|
-| M Theorem 4.3 / Claim 4.16 (stateless route of Theorem 4.1) | M p. 49: "We quote that bound, restated under the accounting of Section 4.3; its proof is in [HK22]." Claim 4.16 applies the [HK22] reductions, augmented. | `Shrincs.StatelessBound A εsl`: in the game after the PRF and reprogramming hops (`gameHybS`), a stateless-branch forgery wins with probability `≤ εsl`. `εsl : ℝ≥0∞` is an unconstrained abstract bound (not the ten [HK22] summands in Lean); `H_msg^sl` is deterministic and `A` has unbounded local evaluations of `pr.Th`/`pr.HmsgSl`, so stateless cross-binding (`PK.sf ‖ M`) is not exercised by `theorem_4_1`. |
+| M Theorem 4.3 (standalone SLH-DSA) / Claim 4.16 (stateless route of Theorem 4.1) | M p. 49: "We quote that bound, restated under the accounting of Section 4.3; its proof is in [HK22]." Claim 4.16 applies the [HK22] reductions, augmented. | **Claim 4.16 is proved unconditionally** (`Shrincs.claim_4_16`, `Slhdsa.postPrf_bound`), discharging `StatelessBound` in `Shrincs.theorem_4_1_full`, `theorem_4_1_full_of_ud_le`, and `corollary_4_1_full` with all 10 explicit [HK22] post-PRF summands (under `yToBytes` injectivity and `enc.Injective`; §4.6). The backwards-compatible `theorem_4_1` alias still accepts abstract `StatelessBound A εsl`. Standalone Theorem 4.3 is not yet packaged separately. |
 | M Conjecture 3.1 | Stated as a conjecture; Theorems 4.1 and 4.2 assume it. Lemma 3.2 bounds its failure only in the ideal model. | `GrindComplete pr` hypothesis. Lemma 3.2 is proved separately (`epsGc_shrincs_lt : < 2^-994`). |
 | M SM-DSPR row of Table 6 | Conjectured (M p. 77). | `Concrete/`: the stateless and full sums take `dspr` as an argument; the figures use `dsprRow`, and `slSum_le_slBound` holds for any smaller value. |
 | M Conjecture 4.1 (collection oracle harmless) | Conjecture | Not assumed. Collection budgets are not tracked at all (§4.6). |
@@ -296,52 +296,67 @@ Departures:
 
 ### 4.6 Theorem 4.1 (SHRINCS)
 
-`theorem_4_1` bounds the forger's success by the sum of:
+`theorem_4_1_full` bounds the forger's success unconditionally (no `StatelessBound` hypothesis) by
+the complete 21-term sum:
 
 - the two PRF terms: `Adv^prf_{q₁}` and `Adv^prf_{q_s}` for `PRF_msg`;
-- the nine Theorem 4.2 terms for the augmented reductions, which run with a forger `A_F` that
-  simulates the stateless path itself;
-- `εsl` from `StatelessBound` (§2).
+- the nine Theorem 4.2 terms for the augmented stateful reductions `B0(A_F)`, `B1S`, `B2S–B8S`;
+- the ten explicit stateless post-PRF terms of Claim 4.16 (`Shrincs.claim_4_16` via
+  `Slhdsa.postPrf_bound`): `ITSR` for `H_msg^sl`, `w − 2` WOTS-TW `SM-UD` terms, WOTS-TW `SM-PRE`,
+  WOTS-TW `F` `SM-TCR`, XMSS `H` `SM-TCR`, `Th_k` `SM-TCR`, `Th_lsl` `SM-TCR`, FORS `H` `SM-TCR`,
+  `3 ·` FORS `F` `SM-TCR`, and FORS `F` `SM-DSPR`.
 
-`theorem_4_1_of_ud_le` collapses the `w − 2` SM-UD terms to `w · ε`, and `corollary_4_1` replaces
-`B₀(A_F)` and `B₁⁺` by their classical ROM bounds (`(q_h+2)/|Digest| + (q_h+1)/|Y|` and
-`q_h/|Y|` via `B1S_diAdvantage_le`).
+`theorem_4_1_full_of_ud_le` collapses the `w − 2` stateful and `w − 2` stateless SM-UD terms to
+`w · ε_sf` and `w · ε_sl`, and `corollary_4_1_full` replaces `B₀(A_F)` and `B₁⁺` by their classical
+ROM bounds (`(q_h+2)/|Digest| + (q_h+1)/|Y|` and `q_h/|Y|` via `B1S_diAdvantage_le`). The earlier
+`StatelessBound`-parameterised statements `theorem_4_1`, `theorem_4_1_of_ud_le`, and `corollary_4_1`
+remain available for backwards compatibility.
 
 `q₁ = L·l_sf + Σ_{i<d} 2^{h'(d−i)}·l_sl + 2^h·k·2^a`, the exact number of secret elements
 (`cacheAdv_Bprf_bound`). This is at most the document's count.
 
 Departures:
 
-- **Stage-1 virtual-tree precomputation in `B2S–B8S` (Claim 4.15) and remaining time/budget scope.**
+- **Stage-1 precomputation in Claim 4.15 (`B2S–B8S`) and Claim 4.16 (`Slhdsa/Bridge.lean`,
+  `WotsHybrid.lean`, `PostPrf.lean`, `Shrincs/Claim416.lean`), and remaining time/budget scope.**
   - Following M Claim 4.15 (p. 65), `B2S, B3S γ, B4S, B5S, B6S, B7S, B8S` (`Shrincs/Claim415.lean`)
     do **not** evaluate stateless `Th_λ` hashes in Stage 2. Instead, in Stage 1 each reduction
     samples all stateless secret leaf values `u_sl ←$ (SlSecAdrs vp → pr.Y)` and calls
     `slVirtualTreeM` (`Shrincs/VirtualTree.lean`) to compute `PK.sl` and the complete virtual
     SLH-DSA hypertree lookup table `tbl` via the game's collection oracle `O_coll`
     (`slVirtualTreeDet_spec`).
-  - This step genuinely exercises stateless-vs-stateful tweak disjointness
+  - Symmetrically, following M Claim 4.16 (p. 66), every stateless collection reduction
+    (`B_ud`, `B_pre`, `B_tcrF_wots`, `B_tcrH_xmss`, `B_tcrThK`, `B_tcrThLsl`, `B_tcrH_fors`,
+    `B_tcrF_fors`, `B_dsprF_fors` in `Slhdsa/WotsHybrid.lean` and `Slhdsa/PostPrf.lean`, instantiated
+    with `sfStageShrincs`) precomputes the stateful FXMSS subtree (`PK.sf` and all stateful
+    anchor signatures) in Stage 1 via `Slhdsa.sfPrecompM` through `O_coll`, and precomputes the
+    stateless virtual/hybrid hypertree in Stage 1 via `O_coll` + the challenge oracle, so Stage 2
+    makes **zero** stateful or stateless `Th_λ` evaluations during signing.
+  - Both directions genuinely exercise stateless-vs-stateful tweak disjointness
     (`Scheme.not_isStateful_of_isStateless`, `Scheme.SfAdrs.isStateful_toAdrs`, and
-    `isStateful_of_mem_shrincsX_Omega` for `B8S`'s exclusion partition): every stateful challenge
-    query has a stateful tweak, so no Stage-1 stateless collection query is refused and no
-    stateful challenge log changes (`simulateQ_slVirtualTreeM_{stcr,ud,tcr,pre,excl}`).
-  - Stage 2 runs `AFTable` (`tablePubQ` / `slSignTable`), answering every stateless signature from
-    `tbl` and `u_sl` with **zero** stateless `Th_λ` evaluations (`slSignTable_eq_slSignDet`,
-    `stageHyb_AFTable_eq_AFEager`, `gameHyb_AFEager_evalDistEq_gameHyb_AF`,
-    `Claim415.B2S_exp_eq` … `B8S_exp_eq`).
+    `isStateful_of_mem_shrincsX_Omega` for `B8S`'s exclusion partition): every stateful query has a
+    stateful tweak and every stateless query has a stateless tweak, so neither path's Stage-1
+    collection queries interfere with the other path's challenge tweaks.
   - **Remaining scope:** as in §4.5, running time is not modelled, VCVio's collection games carry
-    no `IsQueryBoundP` budgets on collection queries, and stateful signing / `PK.sf` still runs in
-    Stage 2 (`stageHyb`). Thus the reductions mirror Claim 4.15's Stage-1 stateless simulation
-    structure with zero Stage-2 stateless `Th_λ` work, but do **not** formalise concrete time
-    accounting (`ξ̃_sf ≤ ξ + V_sf`). `B₀(A_F)` and `B₁⁺` attack `H_msg^sf` (not `Th_λ`), and
-    Claim 4.16 remains the explicit `StatelessBound` hypothesis (§2).
-- **Hedged mode and message encoding. Scope / choice.**
+    no `IsQueryBoundP` budgets on collection queries, and in Claim 4.15 stateful signing / `PK.sf`
+    still runs in Stage 2 (`stageHyb`). Thus the reductions mirror Claims 4.15–4.16's Stage-1
+    simulation structure, but do **not** formalise concrete time accounting
+    (`ξ̃_sf ≤ ξ + V_sf`, `ξ̃_sl ≤ ξ + V_sl`). `B₀(A_F)` and `B₁⁺` attack `H_msg^sf` (not `Th_λ`).
+- **Hedged mode and message encoding (`enc.Injective`). Forced (proof) for Claim 4.16; automatic in
+  the document's model.**
   - `Shrincs/Model.lean` proves algorithm-by-algorithm correspondence with `Scheme.Shrincs`
     (`keygen_eq_scheme`, `slSign_eq_scheme_sign`, `slVerify_eq_scheme_verify`,
     `verifyWith_eq_scheme_verify`, `signSF_eq_scheme_sign`).
   - Stateless signing models **hedged mode only** (`optRand ←$ Y`, `Model.lean:211–213`);
     deterministic mode (`opt_rand = PK.seed`, M fn. 11) is omitted.
-  - `MsgEnc` (`Model.lean:77–83`) imposes no injectivity condition on `m ↦ (ctx m, body m)`, and
-    `roSpec` receives structured `(PK.sl, m)` rather than `boundMessage` bytes.
+  - `MsgEnc` (`Model.lean:77–83`) itself imposes no injectivity condition on `m ↦ (ctx m, body m)`,
+    and `roSpec` receives structured `(PK.sl, m)` rather than `boundMessage` bytes. For Claim 4.16
+    (`claim_4_16`, `theorem_4_1_full`), we require `enc.Injective` (`Slhdsa/Bridge.lean:49`), which
+    gives injectivity of `slMsg pkSf m` (`Slhdsa.slMsg_injective`) so that stateless freshness
+    transports from `Msg` to encoded byte strings. Without `enc.Injective`, two distinct
+    `m₁ ≠ m₂ : Msg` with identical `(ctx, body)` yield identical stateless signatures and break
+    stateless EU-CMA trivially. In the document, messages are pairs `(ctx, M)` with `|ctx| ≤ 255`,
+    where `enc` is the identity and injectivity is automatic.
   - `Forger` inherits Theorem 4.2's static `(qh₁, qh₂)` stage split and `[Nontrivial Msg]`.
 - **`ε_ds` absent. Forced (framework) / outside the model.**
   - M Assumption 4.1 charges `ε_ds ≤ 2^-n + 10·2^-2n` for SHA-256 calls of two different named
@@ -354,10 +369,11 @@ Departures:
   - So a Lemma 4.3 event cannot be expressed in the model and no hop meets it. The bound holds as
     stated; adding `ε_ds ≥ 0` is trivial. Justifying the model against SHA-256 is exactly
     Assumption 4.1 and Lemma 4.3, which stay outside the formalisation.
-- **`H_msg^sl` a fixed function. Choice.** M p. 47: H_msg^sl's security property "enters through
-  the itsr notion (Definition 4.11), which is a standard-model notion". In Lean the itsr term is
-  inside the quoted `εsl`. Claims 4.11–4.15 hold for an arbitrary `HmsgSl`, and modelling it as an
-  oracle would change no bound proved here.
+- **`H_msg^sl` a fixed function. Choice.** M p. 47: `H_msg^sl`'s security property "enters through
+  the itsr notion (Definition 4.11), which is a standard-model notion". In Lean, Claim 4.16
+  (`Shrincs/Claim416.lean`, `Slhdsa/PostPrf.lean`) reduces `H_msg^sl` directly to the standard-model
+  `Notions.itsrSucc` game (`Slhdsa.B_itsr`, query budget `q_s`), while Claims 4.11–4.15 hold for an
+  arbitrary `HmsgSl`.
 - **Shared reprogramming distinguisher `B₁⁺`. Route.** `B1S` runs Algorithm 5 on the augmented
   signing phase covering both branches (`WinNotC1S`).
 - **`PRF_msg` budget `q_s`. Route.** The document evaluates it at `q_s^sl + L`. The Lean games
