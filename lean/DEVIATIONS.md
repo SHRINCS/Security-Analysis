@@ -43,6 +43,7 @@ Each departure is classified as one of:
 | M Claim 4.10 | `Fxmss.HonestView.extraction`, `Fxmss.Rom.Honest.claim_4_10` | digest encoding injective (§4.4) |
 | M Theorem 4.2 (classical, ROM for `H_msg^sf`) | `Fxmss.Rom.theorem_4_2`, `theorem_4_2_of_ud_le`, `corollary_4_2` | Conjecture 3.1 (`GrindComplete`), digest encoding injective, `[Nontrivial Msg]`, static `(qh₁, qh₂)` split, no query/time bounds on `B₂–B₈` (§4.5) |
 | M Theorem 4.1 (classical) | `Shrincs.theorem_4_1_full`, `theorem_4_1_full_of_ud_le`, `corollary_4_1_full`, `Shrincs.claim_4_16` (plus backwards-compatible `StatelessBound` forms `theorem_4_1`, `theorem_4_1_of_ud_le`, `corollary_4_1`) | Conjecture 3.1, digest encoding injective (`yToBytes`), message encoding injective (`enc.Injective`), `[Nontrivial Msg]`, static `(qh₁, qh₂)` split, hedged stateless mode, Stage-1 `O_coll` precomputation in `B2S–B8S` and Claim 4.16 reductions (no query/time bounds on collection reductions, §4.6) |
+| M Theorem 4.3 (standalone SLH-DSA, `[HK22]`) | `Slhdsa.theorem_4_3`, `theorem_4_3_of_ud_le`, `slhdsaScheme_perfectlyComplete` | digest encoding injective (`yToBytes`), message encoding injective (`enc.Injective`), hedged pure mode, standard model for `Th_λ` and `H_msg^sl` (`ITSR`), no query/time bounds on collection reductions (§4.6) |
 | M Lemma 5.1 (verification query counts) | `Scheme.VerifyCount.*`, `Concrete.Vsf_bounds_fxmssVerify`, `Concrete.Vsl_bounds_slVerify` | stateful path proved on explicit-query `fxmssPkFromSigM` (`simulateQ_fxmssPkFromSigM = Fxmss.pkFromSig`); stateless path proved on `SLHDSA.GeneralScheme.verifyInternalM` (`shrincs_verify_stateless_eq_simulateQ = Shrincs.verify`) (§4.7) |
 | M §6 classical and quantum figures | `Concrete/`, `Concrete/Quantum/` | evaluation of Table 6/7 sums; the SM-DSPR row is the document's conjecture (§2, §4.7) |
 | M Lemma C.8 (quantum ZeroDist) | `Undetectability.ZeroDist.Adaptive.advantage_le_of_lossless` | the document's halting assumption (Remark C.1); stage 2 as effect (§5.2) |
@@ -57,7 +58,7 @@ Each of these is an explicit hypothesis of the theorems that use it.
 
 | Result | What the document says | Lean |
 |---|---|---|
-| M Theorem 4.3 (standalone SLH-DSA) / Claim 4.16 (stateless route of Theorem 4.1) | M p. 49: "We quote that bound, restated under the accounting of Section 4.3; its proof is in [HK22]." Claim 4.16 applies the [HK22] reductions, augmented. | **Claim 4.16 is proved unconditionally** (`Shrincs.claim_4_16`, `Slhdsa.postPrf_bound`), discharging `StatelessBound` in `Shrincs.theorem_4_1_full`, `theorem_4_1_full_of_ud_le`, and `corollary_4_1_full` with all 10 explicit [HK22] post-PRF summands (under `yToBytes` injectivity and `enc.Injective`; §4.6). The backwards-compatible `theorem_4_1` alias still accepts abstract `StatelessBound A εsl`. Standalone Theorem 4.3 is not yet packaged separately. |
+| M Theorem 4.3 (standalone SLH-DSA) / Claim 4.16 (stateless route of Theorem 4.1) | M p. 49: "We quote that bound, restated under the accounting of Section 4.3; its proof is in [HK22]." Claim 4.16 applies the [HK22] reductions, augmented. | **Both Theorem 4.3 and Claim 4.16 are now proved unconditionally in Lean** (`Slhdsa.theorem_4_3`, `Slhdsa.theorem_4_3_of_ud_le`, `Shrincs.claim_4_16`, `Slhdsa.postPrf_bound`), discharging `StatelessBound` in `Shrincs.theorem_4_1_full`, `theorem_4_1_full_of_ud_le`, and `corollary_4_1_full` with all explicit `[HK22]` summands (under `yToBytes` injectivity and `enc.Injective`; §4.6). Only the backwards-compatible `theorem_4_1` alias still accepts abstract `StatelessBound A εsl`. |
 | M Conjecture 3.1 | Stated as a conjecture; Theorems 4.1 and 4.2 assume it. Lemma 3.2 bounds its failure only in the ideal model. | `GrindComplete pr` hypothesis. Lemma 3.2 is proved separately (`epsGc_shrincs_lt : < 2^-994`). |
 | M SM-DSPR row of Table 6 | Conjectured (M p. 77). | `Concrete/`: the stateless and full sums take `dspr` as an argument; the figures use `dsprRow`, and `slSum_le_slBound` holds for any smaller value. |
 | M Conjecture 4.1 (collection oracle harmless) | Conjecture | Not assumed. Collection budgets are not tracked at all (§4.6). |
@@ -390,6 +391,18 @@ Departures:
     unchanged.
 - **GAME.6. Route.** It is implicit: every forgery is on exactly one branch, so
   `Win = Wsf ∨ Wsl`.
+- **Standalone Theorem 4.3 (`Slhdsa/Theorem43.lean`).** Instantiates VCVio's `SignatureAlg ProbComp`
+  (Definition 4.13/4.14, `Notions.EUCMAAdversary`, `Notions.euCmaSucc`) with pure-mode hedged
+  FIPS 205 SLH-DSA (`Slhdsa.slhdsaScheme`, proved perfectly complete in
+  `slhdsaScheme_perfectlyComplete`), and proves `Slhdsa.theorem_4_3` and `theorem_4_3_of_ud_le`
+  with all 12 explicit summands: `Adv^prf_{PRF, q₁}(B_sl_prfAdv A)` (exact budget
+  `q₁ = slSecretCount vp.sl`, querying every `SlSecAdrs vp` once via `tableM`),
+  `Adv^prf_{PRF_msg^sl, q_s}(B_sl_prfmsgAdv A)` (exact budget `q_s`), plus all 10 post-PRF
+  summands via `Slhdsa.postPrf_bound` with trivial `SfStage1.unit`. Unlike Theorem 4.1, standalone
+  Theorem 4.3 does **not** require `[Fintype Msg]`, `[Nontrivial Msg]`, or Conjecture 3.1 (it works
+  for any `Msg` with `enc.Injective` and `Function.Injective pr.yToBytes`); the same scope caveats
+  apply (hedged pure mode only, standard model for `Th_λ` and `H_msg^sl`, no runtime or
+  collection-query-budget tracking).
 
 ### 4.7 Section 6 figures
 

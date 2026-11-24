@@ -40,6 +40,7 @@ document's result and the Lean declaration that proves it. Every declaration dep
 | Main, §2–3 | Scheme, Lemma 3.1 (i) (correctness) | `Scheme/Shrincs.lean` (`verify_sign`, `execute_correct`) | done |
 | Main, §4.3 / App. D.3 | Lemma 4.2, classical (independent functions are harmless), instantiated for Lemma C.9, SM-TCR, Repro, DI-Repro | `gameExt_eq_game_dropExt`, `smtcrGameExt_eq`, `diAdvantageExt_eq` (`Notions/Generic/IndependentFunctions.lean`) | done |
 | Main, §4.7 | Theorem 4.2 (FXMSS, classical ROM for `H_msg^sf`, Conjecture 3.1 as hypothesis `GrindComplete`), Claims 4.1–4.10, Remark 4.6 | `Fxmss.Rom.theorem_4_2`, `corollary_4_2` (SM-rTCR and DI-Repro `q_h/|Y|` terms replaced by their classical bounds), `claim_4_1` … `claim_4_9`, `Honest.claim_4_10`, `wrap`/`succ_wrap` (`ShrincsSecurity/Fxmss/`) | done |
+| Main, §4.6 | Theorem 4.3 (standalone SLH-DSA EU-CMA, `[HK22]`, all 12 terms + perfect completeness) | `Slhdsa.theorem_4_3`, `theorem_4_3_of_ud_le`, `slhdsaScheme_perfectlyComplete` (`ShrincsSecurity/Slhdsa/Theorem43.lean`) | done (see `DEVIATIONS.md` §4.6) |
 | Main, §4.8 | Theorem 4.1 (SHRINCS), Claims 4.11–4.16 (stateless route proved unconditionally with all 10 [HK22] post-PRF terms under `yToBytes` and `enc` injectivity; no `StatelessBound` hypothesis) | `Shrincs.theorem_4_1_full`, `theorem_4_1_full_of_ud_le`, `corollary_4_1_full`, `Shrincs.claim_4_16`, `Slhdsa.postPrf_bound`, `claim_4_11` … `claim_4_15`, Stage-1 `O_coll` precomputation (`ShrincsSecurity/Slhdsa/{Bridge,WotsHybrid,PostPrf}.lean`, `ShrincsSecurity/Shrincs/{VirtualTree,Claim415,Claim416,Theorem41}.lean`) | done (see `DEVIATIONS.md` §4.6) |
 | Main, §6 | Classical figures: Table 5 (122.23 / 122.75 / 121.47 bits), Eqs. (1), (3), (9), Section 6.4, Remark 6.1, Table 8 | `ShrincsSecurity/Concrete/` (kernel-checked evaluation of the paper's sums of Table 6 bounds; SM-DSPR row taken as the paper's conjecture; row links to Cor. G.1, Cor. C.2, Thm. E.1, ITSR Thm. 2, Thm. F.2 in `Concrete/Generic.lean`) | done |
 | Main, §6 | Quantum figures: Table 5 quantum columns, Claims 6.1–6.4, Remark 6.1 (11.7 / 11.2 bits, floor `2^-3.4`), abstract's `2^58.0`–`2^59.2` | `ShrincsSecurity/Concrete/Quantum/` | done |
@@ -57,11 +58,11 @@ an explicit hypothesis of the theorems that use it, never an axiom:
   budgets are not tracked. Lemma 4.1 proves the ideal-model version with an additive term.
 - **Assumption 4.1** (named functions modeled as independent random functions): built into the
   model, in which the named functions are separate objects; `ε_ds` is therefore outside the model.
-- **Claim 4.16** (stateless route of Theorem 4.1, quoted from [HK22] in the paper): **now proved
-  unconditionally** (`Shrincs.claim_4_16`, `Slhdsa.postPrf_bound`), discharging
-  `StatelessBound` completely in `theorem_4_1_full` / `corollary_4_1_full` (under `yToBytes`
-  injectivity and `enc.Injective`). The backwards-compatible `theorem_4_1` alias still accepts
-  abstract `StatelessBound`. Standalone Theorem 4.3 is not yet packaged separately.
+- **Theorem 4.3 and Claim 4.16** (standalone SLH-DSA and the stateless route of Theorem 4.1, quoted
+  from [HK22] in the paper): **both are now proved unconditionally in Lean** (`Slhdsa.theorem_4_3`,
+  `Shrincs.claim_4_16`, `Slhdsa.postPrf_bound`), discharging `StatelessBound` completely in
+  `theorem_4_1_full` / `corollary_4_1_full` (under `yToBytes` injectivity and `enc.Injective`).
+  Only the backwards-compatible `theorem_4_1` alias still accepts abstract `StatelessBound`.
 - **The SM-DSPR bound of Table 6** is conjectured: an explicit argument of the Section 6 sums.
 
 `notes/paper-structure.md` maps every definition, lemma and theorem of the three documents, with
