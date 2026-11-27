@@ -81,13 +81,30 @@ jobs:
           #print axioms ShrincsSecurity.Slhdsa.slhdsaScheme_perfectlyComplete
           #print axioms ShrincsSecurity.Slhdsa.theorem_4_3
           #print axioms ShrincsSecurity.Slhdsa.theorem_4_3_of_ud_le
+          #print axioms ShrincsSecurity.Slhdsa.verifyAndExtractTableM_queryBound
+          #print axioms ShrincsSecurity.Slhdsa.findHybWotsPreM_queryBound
+          #print axioms ShrincsSecurity.Complexity.postPrf_stage2Bounds
+          #print axioms ShrincsSecurity.Complexity.theorem_4_3_stage2Bounds
+          #print axioms ShrincsSecurity.Complexity.theorem_4_1_stateless_stage2Bounds
+          #print axioms ShrincsSecurity.Complexity.theorem_4_3_lazy
+          #print axioms ShrincsSecurity.Complexity.slVirtualTreeM_totalQueryBound
+          #print axioms ShrincsSecurity.Complexity.slChainM_totalQueryBound
+          #print axioms ShrincsSecurity.Complexity.buildHybTreeM_totalQueryBound
+          #print axioms ShrincsSecurity.Complexity.sfPrecompM_totalQueryBound
+          #print axioms ShrincsSecurity.Complexity.fxmssExtractTableM_queryBound
+          #print axioms ShrincsSecurity.Complexity.theorem_4_2_precomp
+          #print axioms ShrincsSecurity.Complexity.theorem_4_2_stage2Bounds
+          #print axioms ShrincsSecurity.Complexity.claim_4_15_precomp
+          #print axioms ShrincsSecurity.Complexity.theorem_4_1_full_precomp
+          #print axioms ShrincsSecurity.Complexity.theorem_4_1_stateful_stage2Bounds
           #print axioms ShrincsSecurity.Undetectability.TwoStageAdversary.lemma10
           #print axioms ShrincsSecurity.Undetectability.TwoStageAdversary.corollary12
           #print axioms ShrincsSecurity.Undetectability.ReproQrom.lemmaC3_both_sharp
           #print axioms ShrincsSecurity.Undetectability.ReproQrom.diRepro_corollaryC3
           EOF
-          # Ensure no non-standard axioms (such as sorryAx) appear
-          if grep -E "depends on axioms:" /tmp/axioms.log | grep -vE '^.+ depends on axioms: \[(propext|Classical\.choice|Quot\.sound)(, (propext|Classical\.choice|Quot\.sound))*\]$'; then
+          # Ensure no non-standard axioms (such as sorryAx) appear (collapse wrapped lines first)
+          awk '/^ / { printf "%s", $0; next } { if (NR>1) print ""; printf "%s", $0 } END { print "" }' /tmp/axioms.log > /tmp/axioms_flat.log
+          if grep -E "depends on axioms:" /tmp/axioms_flat.log | grep -vE '^.+ depends on axioms: \[(propext|Classical\.choice|Quot\.sound)(, (propext|Classical\.choice|Quot\.sound))*\]$'; then
             echo "::error::Unexpected axiom detected!"
             exit 1
           fi

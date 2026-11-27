@@ -41,9 +41,9 @@ Each departure is classified as one of:
 | M Lemmas C.2, C.4, C.5, Corollary C.2 | `Repro.advantage_le`, `advantage_le_expectedSeedSum`, `experiment_filterRun`, `diAdvantage_le`, `corollaryC2` | none (§4.3) |
 | M Lemmas C.6, C.7, C.9, Theorem E.1, Theorem F.2, Corollary G.1, Lemmas 4.1 (i), 4.2 (classical) | `Notions/Generic/`, `ITSR.advantage_le_theoremF2` | classical only; Lemma 4.1 (i) and Theorem F.2 scope caveats (§4.3) |
 | M Claim 4.10 | `Fxmss.HonestView.extraction`, `Fxmss.Rom.Honest.claim_4_10` | digest encoding injective (§4.4) |
-| M Theorem 4.2 (classical, ROM for `H_msg^sf`) | `Fxmss.Rom.theorem_4_2`, `theorem_4_2_of_ud_le`, `corollary_4_2` | Conjecture 3.1 (`GrindComplete`), digest encoding injective, `[Nontrivial Msg]`, static `(qh₁, qh₂)` split, no query/time bounds on `B₂–B₈` (§4.5) |
-| M Theorem 4.1 (classical) | `Shrincs.theorem_4_1_full`, `theorem_4_1_full_of_ud_le`, `corollary_4_1_full`, `Shrincs.claim_4_16` (plus backwards-compatible `StatelessBound` forms `theorem_4_1`, `theorem_4_1_of_ud_le`, `corollary_4_1`) | Conjecture 3.1, digest encoding injective (`yToBytes`), message encoding injective (`enc.Injective`), `[Nontrivial Msg]`, static `(qh₁, qh₂)` split, hedged stateless mode, Stage-1 `O_coll` precomputation in `B2S–B8S` and Claim 4.16 reductions (no query/time bounds on collection reductions, §4.6) |
-| M Theorem 4.3 (standalone SLH-DSA, `[HK22]`) | `Slhdsa.theorem_4_3`, `theorem_4_3_of_ud_le`, `slhdsaScheme_perfectlyComplete` | digest encoding injective (`yToBytes`), message encoding injective (`enc.Injective`), hedged pure mode, standard model for `Th_λ` and `H_msg^sl` (`ITSR`), no query/time bounds on collection reductions (§4.6) |
+| M Theorem 4.2 (classical, ROM for `H_msg^sf`) | `Fxmss.Rom.theorem_4_2`, `theorem_4_2_of_ud_le`, `corollary_4_2`; Stage-1-full-precomputing variant `Complexity.theorem_4_2_precomp` + Stage-2 `Th_λ`-evaluation complexity bounds `Complexity.theorem_4_2_stage2Bounds` (`ξ̃_sf ≤ ξ + V_sf = ξ + 497`) | Conjecture 3.1 (`GrindComplete`), digest encoding injective, `[Nontrivial Msg]`, static `(qh₁, qh₂)` split; tracks worst-case `Th_λ` oracle-evaluation counts (not non-hash RAM/circuit overhead) (§4.5) |
+| M Theorem 4.1 (classical) | `Shrincs.theorem_4_1_full`, `theorem_4_1_full_of_ud_le`, `corollary_4_1_full`, `Shrincs.claim_4_16`; Stage-1-full-precomputing variant `Complexity.theorem_4_1_full_precomp` + `Complexity.claim_4_15_precomp` + Stage-2 `Th_λ`-evaluation bounds `Complexity.theorem_4_1_stateful_stage2Bounds` (`ξ̃_sf ≤ ξ + 497`) and `Complexity.theorem_4_1_stateless_stage2Bounds` (`ξ̃_sl ≤ ξ + 2741`) (plus backwards-compatible `StatelessBound` forms `theorem_4_1`, `theorem_4_1_of_ud_le`, `corollary_4_1`) | Conjecture 3.1, digest encoding injective (`yToBytes`), message encoding injective (`enc.Injective`), `[Nontrivial Msg]`, static `(qh₁, qh₂)` split, hedged stateless mode; tracks worst-case `Th_λ` oracle-evaluation counts (`ξ̃_sf ≤ ξ + V_sf`, `ξ̃_sl ≤ ξ + V_sl`) and Stage-1 `O_coll` query counts (not non-hash RAM/circuit overhead; §4.6) |
+| M Theorem 4.3 (standalone SLH-DSA, `[HK22]`) | `Slhdsa.theorem_4_3`, `theorem_4_3_of_ud_le`, `slhdsaScheme_perfectlyComplete`, `Complexity.theorem_4_3_stage2Bounds` (`ξ̃_sl ≤ ξ + V_sl = ξ + 2741`), lazy-cached `PRF` variant `Complexity.theorem_4_3_lazy` | digest encoding injective (`yToBytes`), message encoding injective (`enc.Injective`), hedged pure mode, standard model for `Th_λ` and `H_msg^sl` (`ITSR`); tracks worst-case `Th_λ` oracle-evaluation counts (not non-hash RAM/circuit overhead; §4.6) |
 | M Lemma 5.1 (verification query counts) | `Scheme.VerifyCount.*`, `Concrete.Vsf_bounds_fxmssVerify`, `Concrete.Vsl_bounds_slVerify` | stateful path proved on explicit-query `fxmssPkFromSigM` (`simulateQ_fxmssPkFromSigM = Fxmss.pkFromSig`); stateless path proved on `SLHDSA.GeneralScheme.verifyInternalM` (`shrincs_verify_stateless_eq_simulateQ = Shrincs.verify`) (§4.7) |
 | M §6 classical and quantum figures | `Concrete/`, `Concrete/Quantum/` | evaluation of Table 6/7 sums; the SM-DSPR row is the document's conjecture (§2, §4.7) |
 | M Lemma C.8 (quantum ZeroDist) | `Undetectability.ZeroDist.Adaptive.advantage_le_of_lossless` | the document's halting assumption (Remark C.1); stage 2 as effect (§5.2) |
@@ -61,7 +61,7 @@ Each of these is an explicit hypothesis of the theorems that use it.
 | M Theorem 4.3 (standalone SLH-DSA) / Claim 4.16 (stateless route of Theorem 4.1) | M p. 49: "We quote that bound, restated under the accounting of Section 4.3; its proof is in [HK22]." Claim 4.16 applies the [HK22] reductions, augmented. | **Both Theorem 4.3 and Claim 4.16 are now proved unconditionally in Lean** (`Slhdsa.theorem_4_3`, `Slhdsa.theorem_4_3_of_ud_le`, `Shrincs.claim_4_16`, `Slhdsa.postPrf_bound`), discharging `StatelessBound` in `Shrincs.theorem_4_1_full`, `theorem_4_1_full_of_ud_le`, and `corollary_4_1_full` with all explicit `[HK22]` summands (under `yToBytes` injectivity and `enc.Injective`; §4.6). Only the backwards-compatible `theorem_4_1` alias still accepts abstract `StatelessBound A εsl`. |
 | M Conjecture 3.1 | Stated as a conjecture; Theorems 4.1 and 4.2 assume it. Lemma 3.2 bounds its failure only in the ideal model. | `GrindComplete pr` hypothesis. Lemma 3.2 is proved separately (`epsGc_shrincs_lt : < 2^-994`). |
 | M SM-DSPR row of Table 6 | Conjectured (M p. 77). | `Concrete/`: the stateless and full sums take `dspr` as an argument; the figures use `dsprRow`, and `slSum_le_slBound` holds for any smaller value. |
-| M Conjecture 4.1 (collection oracle harmless) | Conjecture | Not assumed. Collection budgets are not tracked at all (§4.6). |
+| M Conjecture 4.1 (collection oracle harmless) | Conjecture | Not assumed. Stage-1 `O_coll` query counts are formally bounded for the tree builders (`Complexity.slVirtualTreeM_totalQueryBound`, `slChainM_totalQueryBound`, `buildHybTreeM_totalQueryBound`, `sfPrecompM_totalQueryBound`), while VCVio's collection games enforce no cap on collection queries (§4.5–4.6). |
 
 ---
 
@@ -257,22 +257,25 @@ Departures:
 - **Static per-stage RO split `(qh₁, qh₂)`. Choice (narrower adversary class).** `Forger` bounds
   Stage 1 (`chooseShape`) at `qh₁` and Stage 2 (`forge`) at `qh₂` separately, whereas the document
   gives a single total budget `q_h` that an adversary may split dynamically between stages.
-- **Time `ξ`, query bounds, and Stage-2 signing simulation on `B₂–B₈`. Scope / modeling gap.**
-  Running time is not modelled, and unlike `B₀`/`B₁`, the collection reductions `B₂–B₈` carry no
-  `IsQueryBoundP` bounds on either challenge or collection queries (only the game's `numTargets`
-  caps plus exact-run proofs against real oracles; VCVio's `SM_DT_*_Problem` carries no collection
-  budget, e.g. `VCVio/CryptoFoundations/HardnessAssumptions/TweakableHash/SMDTTCR.lean:58–64`).
-  Further:
-  - `B₂, B₄, B₆, B₇, B₈` record their accepted Stage-1 challenge queries and answers (`recordTcrImpl`,
-    `recordSTcrImpl`, `recordExclImpl`) in Stage 1 and pass `savedQ` to Stage 2, so their Stage-2
-    extractions (`B2extract`, `B4extract`, `B6extract`, `extract7`, `extract9`) are computable and
-    do not recompute targets or call `Notions.leastCounter`;
-  - however, `B₂` and `B₄` make **0** collection queries in Stage 1, and `B₂–B₈` still compute
-    `PK.sf` and FXMSS signing in Stage 2 (`stageHyb`) rather than caching them from Stage-1
-    collection queries;
-  - under Conjecture 4.1 collection budgets do not matter, and the reductions are
-    information-theoretically valid, but they do **not** establish the document's concrete Stage-2
-    time accounting `ξ̃ ≤ ξ + V_sf`.
+- **Time `ξ`, Stage-2 `Th_λ`-evaluation complexity `ξ̃_sf ≤ ξ + V_sf`, and remaining scope (`Complexity/{Defs,SfTable,Stateful}.lean`).**
+  - The baseline reductions `B₂–B₈` (`Fxmss/Claim43.lean`–`Claim49.lean`) still compute `PK.sf`
+    and FXMSS signing in Stage 2 (`stageHyb`) rather than caching them from Stage-1 collection
+    queries, and carry no `Stage2ThBound`.
+  - `Complexity/Stateful.lean` provides **Stage-1-full-precomputing** replacements
+    `B2Pre, B3Pre γ, B4Pre, B5Pre, B6Pre, B7Pre, B8Pre` that precompute the entire FXMSS table
+    `SfFullTable` (`PK.sf`, anchor signatures, encoded digests, blocks, chain values, uncompressed
+    public keys, leaf values, and internal tree nodes) in Stage 1 via `O_chal` and `O_coll`, run
+    zero-`Th_λ` Stage-2 signing (`stageHybPre`), verify and extract the forgery trace in a single
+    explicit-`thSpec`-oracle pass (`fxmssExtractTableM`, bounded by `Vsf P = 497` via
+    `fxmssExtractTableM_queryBound`), and extract every collision/preimage/distinguisher bit purely
+    from `(FxmssTrace, SfFullTable, savedQ)`.
+  - `Complexity.theorem_4_2_precomp` proves the full 9-term Theorem 4.2 EU-CMA bound with
+    `B2Pre … B8Pre`, and `Complexity.theorem_4_2_stage2Bounds` proves simultaneous worst-case
+    Stage-2 `Th_λ`-evaluation bounds `Stage2ThBound ... (ξ + Vsf P)` (`ξ̃_sf ≤ ξ + 497`) for all
+    seven reductions built from any `BudgetedFxmssForger` with Stage-2 `Th_λ` budget `ξ`.
+  - **Remaining scope:** `Stage2ThBound` tracks worst-case `Th_λ` oracle-evaluation counts (the
+    paper's `ξ`, `ξ̃` hash-call complexity accounting), not non-hash RAM/circuit gate overhead;
+    VCVio's `SM_DT_*_Problem` games themselves enforce no collection-query cap.
 - **Minor collection-model details. Choice.**
   - `probGrind`–`probTcrH` (`Fxmss/Members.lean`) pass the full 6-member `pr.collection` to `cons`,
     yielding 7-member collections in which the attacked member appears twice (harmless).
@@ -351,21 +354,38 @@ Departures:
     `Notions.ShrincsAdversary` tracks a single aggregate signing cap `qs = q_s^{sf} + q_s^{sl}`,
     `B_itsr` in `claim_4_16` / `theorem_4_1_full` is typed with cap `qs` (even though only
     stateless queries are forwarded to ITSR).
-  - **Stage-2 extraction & time/budget scope.** As in §4.5, running time is not modelled, VCVio's
-    collection games carry no `IsQueryBoundP` budgets on collection queries, and in Claim 4.15
-    stateful signing / `PK.sf` still runs in Stage 2 (`stageHyb`). On the stateless side
-    (`Slhdsa/TableExtract.lean`, `Slhdsa/WotsHybrid.lean`, `Slhdsa/PostPrf.lean`), all 9 stateless
-    collection reductions (`B_ud`, `B_pre`, `B_tcrF_wots`, `B_tcrH_xmss`, `B_tcrThK`, `B_tcrThLsl`,
-    `B_tcrH_fors`, `B_tcrF_fors`, `B_dsprF_fors`) perform zero `Th_λ` evaluations during Stage-2
-    signing (`slSignTable` / `hybSign`), and perform Stage-2 verification and witness extraction
-    directly against the precomputed Stage-1 table (`vt` / `HybTree`) in a single explicit-oracle
-    pass (`verifyAndExtractTableM` / `findHybWotsPreM`, bounded by `Vsl = 2741` `Th_λ` queries via
-    `verifyAndExtractTableM_queryBound` / `findHybWotsPreM_queryBound`, zero `slRootDet` /
-    `forsPkGen` / `xmssRoot` recomputation). In `B_dsprF_fors`, non-winning runs output the
-    strictly in-range fallback `(0, true)` (`0 < qForsLeaf vp`, `routedTargets_forsLeaf_pos`),
-    complying with Main Paper Definition 4.10 (`j ∈ [|Q|]`) while cancelling the shared
-    `Pr[fallback ∧ SP(Q[0])]` term identically in `SM_DT_DSPR_Advantage`.
-    `B₀(A_F)` and `B₁⁺` attack `H_msg^sf` (not `Th_λ`).
+  - **Stage-2 `Th_λ`-evaluation complexity (`ξ̃_sf ≤ ξ + V_sf`, `ξ̃_sl ≤ ξ + V_sl`), Stage-1
+    `O_coll` query bounds, and remaining scope (`Complexity/{Defs,Slhdsa,SfTable,Stateful}.lean`).**
+    - On the **stateless side** (`Slhdsa/TableExtract.lean`, `Slhdsa/WotsHybrid.lean`,
+      `Slhdsa/PostPrf.lean`, `Complexity/Slhdsa.lean`), all 9 stateless collection reductions
+      (`B_ud`, `B_pre`, `B_tcrF_wots`, `B_tcrH_xmss`, `B_tcrThK`, `B_tcrThLsl`, `B_tcrH_fors`,
+      `B_tcrF_fors`, `B_dsprF_fors`) perform zero `Th_λ` evaluations during Stage-2 signing
+      (`slSignTable` / `hybSign`), and perform Stage-2 verification and witness extraction directly
+      against the precomputed Stage-1 table (`vt` / `HybTree`) in a single explicit-`thSpec`-oracle
+      pass (`verifyAndExtractTableM` / `findHybWotsPreM`, bounded by `Vsl = 2741` via
+      `verifyAndExtractTableM_queryBound` / `findHybWotsPreM_queryBound`, zero `slRootDet` /
+      `forsPkGen` / `xmssRoot` recomputation). `Complexity.postPrf_stage2Bounds`,
+      `Complexity.theorem_4_3_stage2Bounds`, and `Complexity.theorem_4_1_stateless_stage2Bounds`
+      formally prove `Stage2ThBound ... (ξ + Vsl vp.params)` (`ξ̃_sl ≤ ξ + 2741`) for all 9
+      reductions. In `B_dsprF_fors`, non-winning runs output the strictly in-range fallback
+      `(0, true)` (`0 < qForsLeaf vp`, `routedTargets_forsLeaf_pos`), complying with Main Paper
+      Definition 4.10 (`j ∈ [|Q|]`) while cancelling the shared `Pr[fallback ∧ SP(Q[0])]` term
+      identically in `SM_DT_DSPR_Advantage`.
+    - On the **stateful side** (`Complexity/Stateful.lean`), `Complexity.claim_4_15_precomp` and
+      `Complexity.theorem_4_1_full_precomp` replace `B2S–B8S` (which still ran `stageHyb` in Stage 2)
+      with Stage-1-full-precomputing `B2SPre … B8SPre`, and
+      `Complexity.theorem_4_1_stateful_stage2Bounds` formally proves
+      `Stage2ThBound ... (ξ + Vsf vp.params)` (`ξ̃_sf ≤ ξ + 497`) for all 7 augmented stateful
+      reductions. Together, `theorem_4_1_full_precomp` + `theorem_4_1_stateful_stage2Bounds` +
+      `theorem_4_1_stateless_stage2Bounds` certify the exact Stage-2 `Th_λ` overhead `ξ + V_sf`
+      and `ξ + V_sl` across all 16 collection reductions of Theorem 4.1.
+    - **Stage-1 `O_coll` / challenge query bounds** are proved for the precomputation builders in
+      `Complexity/Slhdsa.lean`: `slVirtualTreeM_totalQueryBound`, `slChainM_totalQueryBound`,
+      `buildHybTreeM_totalQueryBound`, and `sfPrecompM_totalQueryBound`.
+    - **Remaining scope:** `Stage2ThBound` tracks worst-case `Th_λ` oracle-evaluation counts (the
+      paper's `ξ`, `ξ̃` hash-call complexity), not non-hash RAM/circuit gate overhead; VCVio's
+      collection games enforce no collection-query cap; and Theorems 4.1–4.3 remain classical.
+      `B₀(A_F)` and `B₁⁺` attack `H_msg^sf` (not `Th_λ`).
 - **Hedged mode and message encoding (`enc.Injective`). Forced (proof) for Claim 4.16; automatic in
   the document's model.**
   - `Shrincs/Model.lean` proves algorithm-by-algorithm correspondence with `Scheme.Shrincs`
@@ -414,18 +434,22 @@ Departures:
     unchanged.
 - **GAME.6. Route.** It is implicit: every forgery is on exactly one branch, so
   `Win = Wsf ∨ Wsl`.
-- **Standalone Theorem 4.3 (`Slhdsa/Theorem43.lean`).** Instantiates VCVio's `SignatureAlg ProbComp`
-  (Definition 4.13/4.14, `Notions.EUCMAAdversary`, `Notions.euCmaSucc`) with pure-mode hedged
-  FIPS 205 SLH-DSA (`Slhdsa.slhdsaScheme`, proved perfectly complete in
-  `slhdsaScheme_perfectlyComplete`), and proves `Slhdsa.theorem_4_3` and `theorem_4_3_of_ud_le`
-  with all 12 explicit summands: `Adv^prf_{PRF, q₁}(B_sl_prfAdv A)` (exact budget
-  `q₁ = slSecretCount vp.sl`, querying every `SlSecAdrs vp` once via `tableM`),
+- **Standalone Theorem 4.3 (`Slhdsa/Theorem43.lean`, `Complexity/Slhdsa.lean`).** Instantiates
+  VCVio's `SignatureAlg ProbComp` (Definition 4.13/4.14, `Notions.EUCMAAdversary`,
+  `Notions.euCmaSucc`) with pure-mode hedged FIPS 205 SLH-DSA (`Slhdsa.slhdsaScheme`, proved
+  perfectly complete in `slhdsaScheme_perfectlyComplete`), and proves `Slhdsa.theorem_4_3` and
+  `theorem_4_3_of_ud_le` with all 12 explicit summands: `Adv^prf_{PRF, q₁}(B_sl_prfAdv A)` (exact
+  budget `q₁ = slSecretCount vp.sl`, querying every `SlSecAdrs vp` once via `tableM`),
   `Adv^prf_{PRF_msg^sl, q_s}(B_sl_prfmsgAdv A)` (exact budget `q_s`), plus all 10 post-PRF
-  summands via `Slhdsa.postPrf_bound` with trivial `SfStage1.unit`. Unlike Theorem 4.1, standalone
-  Theorem 4.3 does **not** require `[Fintype Msg]`, `[Nontrivial Msg]`, or Conjecture 3.1 (it works
-  for any `Msg` with `enc.Injective` and `Function.Injective pr.yToBytes`); the same scope caveats
-  apply (hedged pure mode only, standard model for `Th_λ` and `H_msg^sl`, no runtime or
-  collection-query-budget tracking).
+  summands via `Slhdsa.postPrf_bound` with trivial `SfStage1.unit`. `Complexity/Slhdsa.lean` also
+  provides a lazy-cached `PRF` reduction `B_sl_prfLazyAdv` (querying only on-demand during keygen
+  and signing with `≤ slSecretCount vp.sl` queries, avoiding eager full-table enumeration) via
+  `Complexity.theorem_4_3_lazy`, together with `Complexity.theorem_4_3_stage2Bounds` proving
+  `Stage2ThBound ... (ξ + Vsl vp.params)` (`ξ̃_sl ≤ ξ + 2741`) for all 9 collection reductions.
+  Unlike Theorem 4.1, standalone Theorem 4.3 does **not** require `[Fintype Msg]`, `[Nontrivial Msg]`,
+  or Conjecture 3.1 (it works for any `Msg` with `enc.Injective` and `Function.Injective pr.yToBytes`);
+  remaining scope caveats are hedged pure mode only, standard model for `Th_λ` and `H_msg^sl`, and
+  `Th_λ` oracle-evaluation complexity tracking (not non-hash RAM/circuit overhead).
 
 ### 4.7 Section 6 figures
 

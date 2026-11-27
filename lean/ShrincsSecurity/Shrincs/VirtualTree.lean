@@ -1914,7 +1914,7 @@ noncomputable def AFTable {qs qh₁ qh₂ L : ℕ} (A : Forger pr Msg enc qs qh�
 
 omit [Fintype pr.Y] [Fintype pr.PkSeed] [Fintype pr.Digest] [DecidableEq pr.Digest]
   [SampleableType pr.Digest] [Inhabited pr.Digest] [Fintype Msg] [Nontrivial Msg] in
-private theorem forgeExtDet_congr
+theorem forgeExtDet_congr
     (root₁ root₂ : pr.PkSeed → pr.Y)
     (sign₁ sign₂ : pr.PkSeed → pr.Y → List Byte → pr.Y → Stateless.Sig pr)
     {qs : ℕ} (A : Notions.ShrincsAdversary (scheme pr Msg enc) qs)

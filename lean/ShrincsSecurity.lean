@@ -34,4 +34,8 @@ public import ShrincsSecurity.Slhdsa.PostPrf
 public import ShrincsSecurity.Slhdsa.Theorem43
 public import ShrincsSecurity.Shrincs.Claim416
 public import ShrincsSecurity.Shrincs.Theorem41
+public import ShrincsSecurity.Complexity.Defs
+public import ShrincsSecurity.Complexity.Slhdsa
+public import ShrincsSecurity.Complexity.SfTable
+public import ShrincsSecurity.Complexity.Stateful
 public import ShrincsSecurity.Concrete.Quantum.All
