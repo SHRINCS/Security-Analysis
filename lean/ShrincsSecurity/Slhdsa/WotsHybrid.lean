@@ -1,6 +1,6 @@
 module
 
-public import ShrincsSecurity.Slhdsa.Bridge
+public import ShrincsSecurity.Slhdsa.TableExtract
 public import ShrincsSecurity.Fxmss.HybCommon
 
 /-!
@@ -26,9 +26,10 @@ both Main Paper **Claim 4.16** (`Shrincs/Claim416.lean`) and Main Paper **Theore
 3. **Keyless Stage-2 signing & extraction**:
    * `hybSign`: zero-`Th_λ` Stage-2 signer reading `u` only at `FORS_PRF` (`type = 6`) and reading
      WOTS signatures and auth paths from `HybTree`. At `γ = 0`, `hybSign = slSignDet`.
-   * `findHybWotsPre`: keyless WOTS-preimage extractor using `SLHDSA.Security.findWotsWitness`
-     directly on `HybTree` (zero secret keys). At `γ = 0`, it agrees identically with
-     `SLHDSA.Security.findWitness` returning `.hypertree ⟨ℓ, .wots (.fPreimage c step val)⟩`.
+   * `findHybWotsPre`: single-pass keyless WOTS-preimage extractor built on `TableExtract`
+     (`≤ Vsl vp.params` `Th_λ` queries, zero secret keys, zero calls to opaque `findWotsWitness`).
+     At `γ = 0`, it succeeds whenever `verifyAndExtractTable` verifies and returns a
+     `.hypertree ⟨ℓ, .wots (.fPreimage c step val)⟩` witness.
 4. **Master bound `wotsPre_bound`**: for any Stage-2 interaction ignoring `u` at `WOTS_PRF`
    (`type = 5`),
    `Pr_{Hyb(0)}[IsHybWotsPre] ≤ ∑_{γ < w - 2} Adv^{sm-ud}(B_ud γ) + Succ^{sm-pre}(B_pre)`.
@@ -328,64 +329,80 @@ def hybSign (pk : pr.PkSeed) (hyb : HybTree pr) (u : SlSecAdrs vp → pr.Y)
       ⟨hyb.wotsSig pos, auth⟩
   ⟨R, forsSig, htSig⟩
 
-/-- Keyless layer walk for `findHybWotsPre`, mirroring `SLHDSA.Security.findHypertreeWitness`
-without any secret key. -/
-def findHybWotsPreWalk [DecidableEq pr.Y] (pk : pr.PkSeed) (hyb : HybTree pr)
+/-- Pure 0-query keyless layer walk for `findHybWotsPre`, reading recorded `XmssLayerTrace`s
+against `hyb` without any secret keys or extra `Th_λ` queries. -/
+def findHybWotsPreFromTrace [DecidableEq pr.Y] (hyb : HybTree pr)
     (pos : LayerPosition vp.sl) :
-    (layers : ℕ) → pos.layer.val + layers = vp.sl.params.d → pr.Y →
-      Vector (XmssSig vp.sl.params (prEager pr).core) layers →
+    (layers : ℕ) → pos.layer.val + layers = vp.sl.params.d →
+      Vector (XmssLayerTrace pr) layers →
       Option ((LayerPosition vp.sl × Fin vp.sl.params.len) × ℕ × pr.Y)
-  | 0, _, _, _ => none
-  | 1, _, forgedMsg, sigs =>
-    let recRoot := xmssPkFromSig (prEager pr) pos.leaf.val sigs.head forgedMsg pk pos.toAdrs
+  | 0, _, _ => none
+  | 1, _, trs =>
+    let tr := trs.head
     let honRoot := (hyb.tbl (xmssNodeAdrs pos.toAdrs vp.sl.params.hp 0)).getD default
-    if recRoot = honRoot then
-      let wotsRec := wotsPkFromSig (prEager pr) sigs.head.wots forgedMsg pk
-        (wotsLeafAdrs pos.toAdrs pos.leaf.val)
+    if tr.xmssRoot = honRoot then
       let wotsHon := (hyb.tbl (wotsPkAdrs (wotsInstanceAdrs pos))).getD default
-      if wotsRec = wotsHon then
-        match SLHDSA.Security.findWotsWitness (prEager pr) sigs.head.wots forgedMsg
-            (hyb.wotsSig pos) (hyb.wotsMsg pos) pk (wotsInstanceAdrs pos) with
-        | some (.fPreimage c step val) => some ((pos, c), step, val)
-        | _ => none
+      if tr.wotsPk = wotsHon then
+        match wotsPreFromTrace pr tr.msg (hyb.wotsMsg pos) (hyb.wotsSig pos) tr.wotsTraces with
+        | some (c, step, val) => some ((pos, c), step, val)
+        | none => none
       else none
     else none
-  | layers + 2, hrem, forgedMsg, sigs =>
-    let recRoot := xmssPkFromSig (prEager pr) pos.leaf.val sigs.head forgedMsg pk pos.toAdrs
+  | layers + 2, hrem, trs =>
+    let tr := trs.head
     let honRoot := (hyb.tbl (xmssNodeAdrs pos.toAdrs vp.sl.params.hp 0)).getD default
-    if recRoot = honRoot then
-      let wotsRec := wotsPkFromSig (prEager pr) sigs.head.wots forgedMsg pk
-        (wotsLeafAdrs pos.toAdrs pos.leaf.val)
+    if tr.xmssRoot = honRoot then
       let wotsHon := (hyb.tbl (wotsPkAdrs (wotsInstanceAdrs pos))).getD default
-      if wotsRec = wotsHon then
-        match SLHDSA.Security.findWotsWitness (prEager pr) sigs.head.wots forgedMsg
-            (hyb.wotsSig pos) (hyb.wotsMsg pos) pk (wotsInstanceAdrs pos) with
-        | some (.fPreimage c step val) => some ((pos, c), step, val)
-        | _ => none
+      if tr.wotsPk = wotsHon then
+        match wotsPreFromTrace pr tr.msg (hyb.wotsMsg pos) (hyb.wotsSig pos) tr.wotsTraces with
+        | some (c, step, val) => some ((pos, c), step, val)
+        | none => none
       else none
     else
-      findHybWotsPreWalk pk hyb (pos.next (by omega))
+      findHybWotsPreFromTrace hyb (pos.next (by omega))
         (layers + 1)
         (by simp only [LayerPosition.next_layer_val]; change pos.layer.val + 1 + (layers + 1) = vp.sl.params.d; omega)
-        recRoot sigs.tail
+        trs.tail
 
-/-- **Keyless WOTS-preimage extractor** on a `HybTree`: mirrors `SLHDSA.Security.findWitness`
-without reading any secret keys, returning `some ((pos, c), step, val)` exactly when the forgery
-routes to a WOTS `F`-preimage witness. -/
-def findHybWotsPre [DecidableEq pr.Y] (pk : pr.PkSeed) (hyb : HybTree pr)
+/-- **Single-pass explicit-`Th_λ`-oracle keyless WOTS-preimage extractor** on a `HybTree`:
+verifies `finalRoot = hyb.pkSl` AND extracts `some ((pos, c), step, val)` in ONE pass of
+at most `Vsl vp.params` (`= 2741`) tweakable-hash queries (zero secret keys). -/
+def findHybWotsPreM [DecidableEq pr.Y] (pk : pr.PkSeed) (hyb : HybTree pr)
+    (msg : List Byte) (sig : Stateless.Sig pr) :
+    OracleComp (thSpec pr) (Option ((LayerPosition vp.sl × Fin vp.sl.params.len) × ℕ × pr.Y)) := do
+  let parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk hyb.pkSl msg)
+  let (forsRec, _) ← forsRecoverTraceM pr sig.fors parts.md.toList parts.forsAdrs
+  let (finalRoot, htTraces) ← htRecoverTraceM pr (LayerPosition.initial vp.sl parts)
+    vp.sl.params.d (by simp) forsRec sig.hypertree
+  let forsHon := (hyb.tbl (forsPkAdrs parts.forsAdrs)).getD default
+  return if finalRoot = hyb.pkSl ∧ forsRec ≠ forsHon then
+    findHybWotsPreFromTrace pr hyb (LayerPosition.initial vp.sl parts)
+      vp.sl.params.d (by simp) htTraces
+  else none
+
+/-- **Query bound (`≤ Vsl`)**: `findHybWotsPreM` makes at most `Vsl vp.params` (`= 2741`)
+tweakable-hash queries on every path. -/
+theorem findHybWotsPreM_queryBound [DecidableEq pr.Y] (pk : pr.PkSeed) (hyb : HybTree pr)
+    (msg : List Byte) (sig : Stateless.Sig pr) :
+    IsTotalQueryBound (findHybWotsPreM pr pk hyb msg sig) (Vsl vp.params) := by
+  unfold findHybWotsPreM Vsl
+  refine (isTotalQueryBound_bind (forsRecoverTraceM_queryBound pr sig.fors _ _) fun ⟨forsRec, _⟩ =>
+    isTotalQueryBound_bind (n₂ := 0)
+      (htRecoverTraceM_queryBound pr vp.sl.params.d _ _ forsRec sig.hypertree) fun ⟨finalRoot, htTraces⟩ => by
+        dsimp only
+        simpa only [isQueryBoundP_true_iff] using
+          (isQueryBoundP_pure (spec := thSpec pr) (p := fun _ => True) _ 0)).mono ?_
+  dsimp only [ValidatedParams.sl, Params.slParams]
+  omega
+
+/-- Deterministic simulation of `findHybWotsPreM` under `thRealImpl pr pk`. -/
+noncomputable def findHybWotsPre [DecidableEq pr.Y] (pk : pr.PkSeed) (hyb : HybTree pr)
     (msg : List Byte) (sig : Stateless.Sig pr) :
     Option ((LayerPosition vp.sl × Fin vp.sl.params.len) × ℕ × pr.Y) :=
-  let sigE := toEagerSig pr sig
-  let parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk hyb.pkSl msg)
-  let forsRec := forsPkFromSig (prEager pr) sigE.fors parts.md.toList pk parts.forsAdrs
-  let forsHon := (hyb.tbl (forsPkAdrs parts.forsAdrs)).getD default
-  if forsRec = forsHon then none
-  else
-    findHybWotsPreWalk pr pk hyb (LayerPosition.initial vp.sl parts) vp.sl.params.d
-      (by simp) forsRec sigE.hypertree
+  Id.run (simulateQ (thRealImpl pr pk) (findHybWotsPreM pr pk hyb msg sig))
 
 /-- Boolean predicate: `findHybWotsPre` succeeds on `o`. -/
-def isHybWotsPre [DecidableEq pr.Y] (pk : pr.PkSeed) (hyb : HybTree pr)
+noncomputable def isHybWotsPre [DecidableEq pr.Y] (pk : pr.PkSeed) (hyb : HybTree pr)
     (o : Option (List Byte × Stateless.Sig pr)) : Bool :=
   match o with
   | some (msg, sig) => (findHybWotsPre pr pk hyb msg sig).isSome
@@ -491,11 +508,11 @@ def HybWotsConsistent (pk : pr.PkSeed) (hyb : HybTree pr) : Prop :=
       SLHDSA.wotsPkFromSig (prEager pr) (hyb.wotsSig pos) (hyb.wotsMsg pos) pk
         (wotsInstanceAdrs pos)
 
-/-- **Soundness of `findHybWotsPre` in ANY consistent `HybTree`**: if `findHybWotsPre` returns
+/-- **Soundness of `findHybWotsPre` in ANY `HybTree`**: if `findHybWotsPre` returns
 `some ((pos, c), step, val)`, then `step < w - 1`, `step + 1 = b`, and `val` is an `F`-preimage
 of `(hyb.wotsSig pos)[c.val]` at `(wotsChainAdrs (wotsInstanceAdrs pos) c.val).setHashAddress step`. -/
 theorem findHybWotsPre_sound [DecidableEq pr.Y] (pk : pr.PkSeed) (hyb : HybTree pr)
-    (hcons : HybWotsConsistent pr pk hyb) (msg : List Byte) (sig : Stateless.Sig pr)
+    (_hcons : HybWotsConsistent pr pk hyb) (msg : List Byte) (sig : Stateless.Sig pr)
     {pos : LayerPosition vp.sl} {c : Fin vp.sl.params.len} {step : ℕ} {val : pr.Y}
     (h : findHybWotsPre pr pk hyb msg sig = some ((pos, c), step, val)) :
     step < vp.sl.params.w - 1 ∧
@@ -503,86 +520,77 @@ theorem findHybWotsPre_sound [DecidableEq pr.Y] (pk : pr.PkSeed) (hyb : HybTree 
       pr.F pk ((wotsChainAdrs (wotsInstanceAdrs pos) c.val).setHashAddress step) val =
         (hyb.wotsSig pos)[c.val] := by
   have hwalk : ∀ (layers : ℕ) (p0 : LayerPosition vp.sl) (hrem : p0.layer.val + layers = vp.sl.params.d)
-      (fMsg : pr.Y) (sigs : Vector (XmssSig vp.sl.params (prEager pr).core) layers),
-      findHybWotsPreWalk pr pk hyb p0 layers hrem fMsg sigs = some ((pos, c), step, val) →
+      (fMsg : pr.Y) (sigs : Vector (SLHDSA.XmssSig vp.sl.params pr.toSLHDSA.core) layers),
+      findHybWotsPreFromTrace pr hyb p0 layers hrem
+        (Id.run (simulateQ (thRealImpl pr pk) (htRecoverTraceM pr p0 layers hrem fMsg sigs))).2 =
+        some ((pos, c), step, val) →
       step < vp.sl.params.w - 1 ∧
         step + 1 = chainStepsCore pr.toSLHDSA.core (hyb.wotsMsg pos) c.val ∧
         pr.F pk ((wotsChainAdrs (wotsInstanceAdrs pos) c.val).setHashAddress step) val =
           (hyb.wotsSig pos)[c.val] := by
     intro layers
     induction layers using Nat.twoStepInduction with
-    | zero => intro _ _ _ _ hw; simp [findHybWotsPreWalk] at hw
+    | zero => intro _ _ _ _ hw; simp [findHybWotsPreFromTrace] at hw
     | one =>
       intro p0 hrem fMsg sigs hw
-      unfold findHybWotsPreWalk at hw
+      have htr := simulateQ_xmssRecoverTraceM_spec pr pk p0 sigs.head fMsg
+      simp only [htRecoverTraceM, simulateQ_bind, Id.run_bind, simulateQ_pure, Id.run_pure,
+        findHybWotsPreFromTrace] at hw
+      have hhd : (#v[Id.run (simulateQ (thRealImpl pr pk) (xmssRecoverTraceM pr p0 sigs.head fMsg))]).head =
+          Id.run (simulateQ (thRealImpl pr pk) (xmssRecoverTraceM pr p0 sigs.head fMsg)) := rfl
+      rw [hhd] at hw
       dsimp only at hw
-      by_cases hroot : xmssPkFromSig (prEager pr) p0.leaf.val sigs.head fMsg pk p0.toAdrs =
-          (hyb.tbl (xmssNodeAdrs p0.toAdrs vp.sl.params.hp 0)).getD default
-      · rw [ite_eq_left hroot] at hw
-        by_cases hwots : wotsPkFromSig (prEager pr) sigs.head.wots fMsg pk (wotsLeafAdrs p0.toAdrs p0.leaf.val) =
-            (hyb.tbl (wotsPkAdrs (wotsInstanceAdrs p0))).getD default
-        · rw [ite_eq_left hwots] at hw
-          cases hfw : SLHDSA.Security.findWotsWitness (prEager pr) sigs.head.wots fMsg
-              (hyb.wotsSig p0) (hyb.wotsMsg p0) pk (wotsInstanceAdrs p0) with
-          | none => rw [hfw] at hw; simp at hw
-          | some w =>
-            rw [hfw] at hw
-            cases w with
-            | tlCollision _ => simp at hw
-            | fCollision _ _ _ => simp at hw
-            | fPreimage c' step' val' =>
-              simp only [Option.some.injEq, Prod.mk.injEq] at hw
-              obtain ⟨⟨rfl, rfl⟩, rfl, rfl⟩ := hw
-              rw [wotsLeafAdrs_eq_wotsInstanceAdrs'] at hwots
-              have hpk : SLHDSA.wotsPkFromSig (prEager pr) sigs.head.wots fMsg pk (wotsInstanceAdrs p0) =
-                  SLHDSA.wotsPkFromSig (prEager pr) (hyb.wotsSig p0) (hyb.wotsMsg p0) pk
-                    (wotsInstanceAdrs p0) := hwots.trans (hcons p0)
-              have hs := SLHDSA.Security.findWotsWitness_sound (prEager pr) sigs.head.wots fMsg
-                (hyb.wotsSig p0) (hyb.wotsMsg p0) pk (wotsInstanceAdrs p0) hpk hfw
-              rw [SLHDSA.Security.WotsWitness.valid_fPreimage] at hs
-              exact hs
-        · rw [ite_eq_right hwots] at hw; simp at hw
-      · rw [ite_eq_right hroot] at hw; simp at hw
+      split at hw
+      · split at hw
+        · cases hwp : wotsPreFromTrace pr
+              (Id.run (simulateQ (thRealImpl pr pk) (xmssRecoverTraceM pr p0 sigs.head fMsg))).msg
+              (hyb.wotsMsg p0) (hyb.wotsSig p0)
+              (Id.run (simulateQ (thRealImpl pr pk) (xmssRecoverTraceM pr p0 sigs.head fMsg))).wotsTraces with
+          | none => rw [hwp] at hw; cases hw
+          | some t =>
+            rcases t with ⟨c', step', val'⟩
+            rw [hwp] at hw
+            simp only [Option.some.injEq, Prod.mk.injEq] at hw
+            obtain ⟨⟨rfl, rfl⟩, rfl, rfl⟩ := hw
+            rw [htr.1, htr.2.2.2.2.1] at hwp
+            have hs := wotsPreFromTrace_sound pr pk sigs.head.wots (hyb.wotsSig p0) fMsg
+              (hyb.wotsMsg p0) (wotsLeafAdrs p0.toAdrs p0.leaf.val) hwp
+            rwa [wotsLeafAdrs_eq_wotsInstanceAdrs'] at hs
+        · cases hw
+      · cases hw
     | more layers _ ih =>
       intro p0 hrem fMsg sigs hw
-      unfold findHybWotsPreWalk at hw
-      dsimp only at hw
-      by_cases hroot : xmssPkFromSig (prEager pr) p0.leaf.val sigs.head fMsg pk p0.toAdrs =
-          (hyb.tbl (xmssNodeAdrs p0.toAdrs vp.sl.params.hp 0)).getD default
-      · rw [ite_eq_left hroot] at hw
-        by_cases hwots : wotsPkFromSig (prEager pr) sigs.head.wots fMsg pk (wotsLeafAdrs p0.toAdrs p0.leaf.val) =
-            (hyb.tbl (wotsPkAdrs (wotsInstanceAdrs p0))).getD default
-        · rw [ite_eq_left hwots] at hw
-          cases hfw : SLHDSA.Security.findWotsWitness (prEager pr) sigs.head.wots fMsg
-              (hyb.wotsSig p0) (hyb.wotsMsg p0) pk (wotsInstanceAdrs p0) with
-          | none => rw [hfw] at hw; simp at hw
-          | some w =>
-            rw [hfw] at hw
-            cases w with
-            | tlCollision _ => simp at hw
-            | fCollision _ _ _ => simp at hw
-            | fPreimage c' step' val' =>
-              simp only [Option.some.injEq, Prod.mk.injEq] at hw
-              obtain ⟨⟨rfl, rfl⟩, rfl, rfl⟩ := hw
-              rw [wotsLeafAdrs_eq_wotsInstanceAdrs'] at hwots
-              have hpk : SLHDSA.wotsPkFromSig (prEager pr) sigs.head.wots fMsg pk (wotsInstanceAdrs p0) =
-                  SLHDSA.wotsPkFromSig (prEager pr) (hyb.wotsSig p0) (hyb.wotsMsg p0) pk
-                    (wotsInstanceAdrs p0) := hwots.trans (hcons p0)
-              have hs := SLHDSA.Security.findWotsWitness_sound (prEager pr) sigs.head.wots fMsg
-                (hyb.wotsSig p0) (hyb.wotsMsg p0) pk (wotsInstanceAdrs p0) hpk hfw
-              rw [SLHDSA.Security.WotsWitness.valid_fPreimage] at hs
-              exact hs
-        · rw [ite_eq_right hwots] at hw; simp at hw
-      · rw [ite_eq_right hroot] at hw
-        exact ih (p0.next (by omega)) _ _ sigs.tail hw
-  unfold findHybWotsPre at h
-  dsimp only at h
-  by_cases hfors : forsPkFromSig (prEager pr) (toEagerSig pr sig).fors
-      (splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk hyb.pkSl msg)).md.toList pk
-      (splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk hyb.pkSl msg)).forsAdrs =
-      (hyb.tbl (forsPkAdrs (splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk hyb.pkSl msg)).forsAdrs)).getD default
-  · rw [ite_eq_left hfors] at h; simp at h
-  · rw [ite_eq_right hfors] at h; exact hwalk vp.sl.params.d _ (by simp) _ _ h
+      have htr := simulateQ_xmssRecoverTraceM_spec pr pk p0 sigs.head fMsg
+      simp only [htRecoverTraceM, simulateQ_bind, Id.run_bind, simulateQ_pure, Id.run_pure,
+        findHybWotsPreFromTrace] at hw
+      have hhd : ∀ {α : Type} {n : ℕ} (a : α) (v : Vector α n), (v.insertIdx 0 a).head = a :=
+        fun _ _ => by simp [Vector.head]
+      have htl : ∀ {α : Type} {n : ℕ} (a : α) (v : Vector α n), (v.insertIdx 0 a).tail = v :=
+        fun _ _ => by apply Vector.ext; intro i hi; simp [Vector.tail_eq_cast_extract]
+      rw [hhd, htl] at hw
+      split at hw
+      · split at hw
+        · cases hwp : wotsPreFromTrace pr
+              (Id.run (simulateQ (thRealImpl pr pk) (xmssRecoverTraceM pr p0 sigs.head fMsg))).msg
+              (hyb.wotsMsg p0) (hyb.wotsSig p0)
+              (Id.run (simulateQ (thRealImpl pr pk) (xmssRecoverTraceM pr p0 sigs.head fMsg))).wotsTraces with
+          | none => rw [hwp] at hw; cases hw
+          | some t =>
+            rcases t with ⟨c', step', val'⟩
+            rw [hwp] at hw
+            simp only [Option.some.injEq, Prod.mk.injEq] at hw
+            obtain ⟨⟨rfl, rfl⟩, rfl, rfl⟩ := hw
+            rw [htr.1, htr.2.2.2.2.1] at hwp
+            have hs := wotsPreFromTrace_sound pr pk sigs.head.wots (hyb.wotsSig p0) fMsg
+              (hyb.wotsMsg p0) (wotsLeafAdrs p0.toAdrs p0.leaf.val) hwp
+            rwa [wotsLeafAdrs_eq_wotsInstanceAdrs'] at hs
+        · cases hw
+      · exact ih (p0.next (by omega)) _ _ sigs.tail hw
+  unfold findHybWotsPre findHybWotsPreM at h
+  simp only [simulateQ_bind, Id.run_bind, simulateQ_pure, Id.run_pure] at h
+  split at h
+  · exact hwalk vp.sl.params.d _ (by simp) _ _ h
+  · cases h
 
 /-- FORS pass of `buildHybTreeM` with `sfDetCall pr pk` computes `honestVal` on every address of
 `forsAddresses vp` and leaves non-FORS addresses `none`. -/
@@ -1771,25 +1779,23 @@ theorem hybSign_indep_wotsSk (pk : pr.PkSeed) (hyb : HybTree pr)
   · exact h ⟨_, hmem⟩ (by simp [forsSkAdrs, Adrs.setTreeIndex, Adrs.setKeyPairAddress, Adrs.setTypeAndClear, AddrType.toCode])
   · rfl
 
-/-- **Exact equivalence at `γ = 0` between keyless `findHybWotsPre` and `SLHDSA.Security.findWitness`**:
-`findHybWotsPre` succeeds on `hybTreeDet pr 0 pk u` if and only if `findWitness` returns a
-`.hypertree ⟨ℓ, .wots (.fPreimage c step val)⟩` witness! -/
-theorem findHybWotsPre_zero_iff [DecidableEq pr.Y] (pk : pr.PkSeed) (u : SlSecAdrs vp → pr.Y)
-    (msg : List Byte) (sig : Stateless.Sig pr) (target : Fin vp.sl.params.k)
-    (hverify : SLHDSA.GeneralScheme.verifyInternal vp.sl (prEager pr) msg (toEagerSig pr sig)
-      ⟨pk, slRootDet pr pk u⟩ = true) :
-    (findHybWotsPre pr pk (hybTreeDet pr 0 pk u) msg sig).isSome = true ↔
-      ∃ (ℓ : Fin vp.sl.params.d) (c : Fin vp.sl.params.len) (step : ℕ) (val : pr.Y),
-        SLHDSA.Security.findWitness (vp := vp.sl) (prims := prEager pr) u
-          ⟨pk, slRootDet pr pk u⟩ msg (toEagerSig pr sig) target =
-          some (.hypertree ⟨ℓ, .wots (.fPreimage c step val)⟩) := by
+/-- **Completeness at `γ = 0`**: whenever `verifyAndExtractTable` verifies and returns a WOTS
+`F`-preimage witness `.hypertree ⟨ℓ, .wots (.fPreimage c step val)⟩`, the single-pass keyless
+extractor `findHybWotsPre` succeeds on `hybTreeDet pr 0 pk u`. -/
+theorem findHybWotsPre_zero_of_verifyAndExtractTable [DecidableEq pr.Y]
+    (pk : pr.PkSeed) (u : SlSecAdrs vp → pr.Y) (tbl : Adrs → Option pr.Y)
+    (htbl : TblComplete pr pk u tbl) (msg : List Byte) (sig : Stateless.Sig pr)
+    (target : Fin vp.sl.params.k) {ℓ : Fin vp.sl.params.d} {c : Fin vp.sl.params.len}
+    {step : ℕ} {val : pr.Y}
+    (hver : (verifyAndExtractTable pr pk (slRootDet pr pk u) tbl u msg sig target).1 = true)
+    (hwit : (verifyAndExtractTable pr pk (slRootDet pr pk u) tbl u msg sig target).2 =
+      some (.hypertree ⟨ℓ, .wots (.fPreimage c step val)⟩)) :
+    (findHybWotsPre pr pk (hybTreeDet pr 0 pk u) msg sig).isSome = true := by
   have hspec := hybTreeDet_zero_spec pr pk u
   set hyb := hybTreeDet pr 0 pk u
-  set parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk (slRootDet pr pk u) msg)
-  have hparts_eq : SLHDSA.Security.schemeParts vp.sl (prEager pr) msg (toEagerSig pr sig)
-      ⟨pk, slRootDet pr pk u⟩ = parts :=
-    SLHDSA.Security.schemeParts_eq vp.sl (prEager pr) msg (toEagerSig pr sig) ⟨pk, slRootDet pr pk u⟩
-  have hfors_hon : (hyb.tbl (forsPkAdrs parts.forsAdrs)).getD default =
+  set pkSl := slRootDet pr pk u
+  set parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk pkSl msg)
+  have hfors_hon_hyb : (hyb.tbl (forsPkAdrs parts.forsAdrs)).getD default =
       SLHDSA.forsPkGen (prEager pr) u pk parts.forsAdrs := by
     let bpos := BottomPosition.ofDigestParts vp.sl parts
     have hmem : forsPkAdrs bpos.forsAdrs ∈ forsAddresses vp := by
@@ -1797,7 +1803,12 @@ theorem findHybWotsPre_zero_iff [DecidableEq pr.Y] (pk : pr.PkSeed) (u : SlSecAd
       exact SLHDSA.Security.mem_forsRootAddresses vp.sl bpos
     have hb : bpos.forsAdrs = parts.forsAdrs := BottomPosition.forsAdrs_ofDigestParts vp.sl parts
     rw [← hb, hspec.2.1 _ hmem, Option.getD_some, honestVal_eq_forsPkGen]
-  -- Helper: show `findHybWotsPreWalk` agrees with `findHypertreeWitness` returning `.wots (.fPreimage ...)`
+  have hfors_hon_tbl : (tbl (forsPkAdrs parts.forsAdrs)).getD default =
+      SLHDSA.forsPkGen (prEager pr) u pk parts.forsAdrs := by
+    have hmem : forsPkAdrs parts.forsAdrs ∈ constructionAddresses vp.sl :=
+      (mem_constructionAddresses_iff _).2 (Or.inr (Or.inr (Or.inl (mem_forsRootAddresses_of_parts parts))))
+    rw [htbl _ hmem, Option.getD_some, honestVal_eq_forsPkGen]
+  -- Layer-by-layer transfer from `htWitnessFromTrace` to `findHybWotsPreFromTrace`
   have hwalk : ∀ (layers : ℕ) (p0 : LayerPosition vp.sl)
       (hrem : p0.layer.val + layers = vp.sl.params.d)
       (fMsg hMsg : pr.Y)
@@ -1805,144 +1816,196 @@ theorem findHybWotsPre_zero_iff [DecidableEq pr.Y] (pk : pr.PkSeed) (u : SlSecAd
       (hMsg_hon : ∀ (j : ℕ) (hj : p0.layer.val + j < vp.sl.params.d),
         SLHDSA.Security.honestLayerMsg vp.sl (prEager pr) u pk p0 hMsg j hj =
           hyb.wotsMsg (p0.advance j hj))
-      (sigs : Vector (XmssSig vp.sl.params (prEager pr).core) layers)
-      (hrecTop : SLHDSA.GeneralHypertree.recoverFromPosition vp.sl (prEager pr) pk p0 layers hrem fMsg sigs =
-        SLHDSA.xmssRoot (prEager pr) u pk (SLHDSA.GeneralHypertree.layerAdrs (vp.sl.params.d - 1) 0)),
-      (findHybWotsPreWalk pr pk hyb p0 layers hrem fMsg sigs).isSome = true ↔
-        ∃ (ℓ : Fin layers) (c : Fin vp.sl.params.len) (step : ℕ) (val : pr.Y),
-          SLHDSA.Security.findHypertreeWitness vp.sl (prEager pr) u pk p0 layers hrem
-            fMsg hMsg sigs = some ⟨ℓ, .wots (.fPreimage c step val)⟩ := by
+      (sigs : Vector (SLHDSA.XmssSig vp.sl.params pr.toSLHDSA.core) layers)
+      (ℓ' : Fin layers),
+      htWitnessFromTrace pr tbl u p0 layers hrem hMsg
+        (Id.run (simulateQ (thRealImpl pr pk) (htRecoverTraceM pr p0 layers hrem fMsg sigs))).2 =
+        some ⟨ℓ', .wots (.fPreimage c step val)⟩ →
+      (findHybWotsPreFromTrace pr hyb p0 layers hrem
+        (Id.run (simulateQ (thRealImpl pr pk) (htRecoverTraceM pr p0 layers hrem fMsg sigs))).2).isSome =
+        true := by
     intro layers; induction layers using Nat.twoStepInduction with
-    | zero =>
-      intro p0 hrem _ _ _ _ _ _
-      exact absurd hrem (by have := p0.layer.isLt; omega)
+    | zero => intro _ _ _ _ _ _ _ ℓ'; exact absurd ℓ'.isLt (Nat.not_lt_zero _)
     | one =>
-      intro p0 hrem fMsg hMsg hMsg_eq _ sigs hrecTop
-      have hroot_hon : (hyb.tbl (xmssNodeAdrs p0.toAdrs vp.sl.params.hp 0)).getD default =
+      intro p0 hrem fMsg hMsg hMsg_eq _ sigs ℓ' hw
+      have hroot_hyb : (hyb.tbl (xmssNodeAdrs p0.toAdrs vp.sl.params.hp 0)).getD default =
           SLHDSA.xmssRoot (prEager pr) u pk p0.toAdrs := by
         have h := hspec.2.2.2.1 (LayerTreeCoord.ofPosition p0) vp.sl.params.hp 0 vp.valid.hp_pos le_rfl (by simp)
         rw [LayerTreeCoord.ofPosition_toAdrs] at h
         rw [h, Option.getD_some, honestVal_eq_xmssRoot]
-      have hwots_hon : (hyb.tbl (wotsPkAdrs (wotsInstanceAdrs p0))).getD default =
-          SLHDSA.xmssLeaf (prEager pr) u pk p0.toAdrs p0.leaf.val := by
-        rw [hspec.2.2.1 p0, Option.getD_some, SLHDSA.xmssLeaf_eq_wotsPkGen,
-          wotsLeafAdrs_eq_wotsInstanceAdrs', honestVal_eq_wotsPkGen]
-      have hr : SLHDSA.xmssPkFromSig (prEager pr) p0.leaf.val sigs.head fMsg pk p0.toAdrs =
+      have hroot_tbl : (tbl (xmssNodeAdrs p0.toAdrs vp.sl.params.hp 0)).getD default =
           SLHDSA.xmssRoot (prEager pr) u pk p0.toAdrs := by
-        have hlay : p0.layer.val = vp.sl.params.d - 1 := by omega
-        have htr0 : p0.tree.val = 0 := by
-          have hh : SLHDSA.layerTreeHeight vp.sl p0.layer.val = 0 := by
-            simp only [SLHDSA.layerTreeHeight, hlay, Nat.mul_eq_zero]
-            left; have := vp.valid.d_pos; change vp.params.slParams.d - (vp.params.slParams.d - 1 + 1) = 0; omega
-          have hlt' : p0.tree.val < 2 ^ 0 := hh ▸ p0.tree.isLt
-          simp at hlt'; exact congrArg Fin.val hlt'
-        have hadrs_top : p0.toAdrs = SLHDSA.GeneralHypertree.layerAdrs (vp.sl.params.d - 1) 0 := by
-          simp [LayerPosition.toAdrs, SLHDSA.GeneralHypertree.layerAdrs, hlay, htr0]
-        simp only [SLHDSA.GeneralHypertree.recoverFromPosition] at hrecTop
-        rwa [← hadrs_top] at hrecTop
-      have hfw_eq :
-          SLHDSA.Security.findWotsWitness (prEager pr) sigs.head.wots fMsg (hyb.wotsSig p0) (hyb.wotsMsg p0) pk (wotsInstanceAdrs p0) =
-          SLHDSA.Security.findWotsWitness (prEager pr) sigs.head.wots fMsg
-            (SLHDSA.wotsSign (prEager pr) hMsg u pk (wotsLeafAdrs p0.toAdrs p0.leaf.val)) hMsg pk
-            (wotsLeafAdrs p0.toAdrs p0.leaf.val) := by
-        rw [wotsLeafAdrs_eq_wotsInstanceAdrs', hMsg_eq, ← hspec.2.2.2.2.2.1 p0]
-      unfold findHybWotsPreWalk
-      dsimp only
-      rw [hroot_hon, ite_eq_left hr, SLHDSA.Security.findHypertreeWitness_eq_of_root _ _ _ _ _ 0 hrem _ _ _ hr,
-        hwots_hon]
-      by_cases hlf : SLHDSA.xmssLeaf (prEager pr) u pk p0.toAdrs p0.leaf.val =
-          SLHDSA.wotsPkFromSig (prEager pr) sigs.head.wots fMsg pk (wotsLeafAdrs p0.toAdrs p0.leaf.val)
-      · rw [ite_eq_left hlf.symm, SLHDSA.Security.findXmssWitness_eq_wots_of_leaf _ _ _ _ _ _ _ _ hlf, hfw_eq]
-        cases SLHDSA.Security.findWotsWitness (prEager pr) sigs.head.wots fMsg
-            (SLHDSA.wotsSign (prEager pr) hMsg u pk (wotsLeafAdrs p0.toAdrs p0.leaf.val)) hMsg pk
-            (wotsLeafAdrs p0.toAdrs p0.leaf.val) with
-        | none => simp
-        | some w => cases w <;> simp
-      · rw [ite_eq_right (fun h => hlf h.symm),
-          SLHDSA.Security.findXmssWitness_eq_node_of_leaf_ne _ _ _ _ _ _ _ _ hlf]
-        simp
+        have hmem : xmssNodeAdrs p0.toAdrs vp.sl.params.hp 0 ∈ constructionAddresses vp.sl := by
+          rw [mem_constructionAddresses_iff]
+          refine Or.inr (Or.inr (Or.inr (Or.inr (Or.inr ?_))))
+          rw [← LayerTreeCoord.ofPosition_toAdrs p0]
+          exact mem_xmssNodeAddresses vp.sl (LayerTreeCoord.ofPosition p0) vp.valid.hp_pos le_rfl (by simp)
+        rw [htbl _ hmem, Option.getD_some, honestVal_eq_xmssRoot]
+      have hwots_hyb : (hyb.tbl (wotsPkAdrs (wotsInstanceAdrs p0))).getD default =
+          SLHDSA.wotsPkGen (prEager pr) u pk (wotsLeafAdrs p0.toAdrs p0.leaf.val) := by
+        rw [hspec.2.2.1 p0, Option.getD_some, wotsLeafAdrs_eq_wotsInstanceAdrs', honestVal_eq_wotsPkGen]
+      have hwots_tbl : (tbl (wotsPkAdrs (wotsLeafAdrs p0.toAdrs p0.leaf.val))).getD default =
+          SLHDSA.wotsPkGen (prEager pr) u pk (wotsLeafAdrs p0.toAdrs p0.leaf.val) := by
+        have hmem : wotsPkAdrs (wotsLeafAdrs p0.toAdrs p0.leaf.val) ∈ constructionAddresses vp.sl := by
+          rw [mem_constructionAddresses_iff, wotsLeafAdrs_eq_wotsInstanceAdrs']
+          exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inl (mem_wotsPkAddresses vp.sl p0)))))
+        rw [htbl _ hmem, Option.getD_some, honestVal_eq_wotsPkGen]
+      have htr := simulateQ_xmssRecoverTraceM_spec pr pk p0 sigs.head fMsg
+      simp only [htRecoverTraceM, simulateQ_bind, Id.run_bind, simulateQ_pure, Id.run_pure,
+        htWitnessFromTrace, findHybWotsPreFromTrace] at hw ⊢
+      have hhd : (#v[Id.run (simulateQ (thRealImpl pr pk) (xmssRecoverTraceM pr p0 sigs.head fMsg))]).head =
+          Id.run (simulateQ (thRealImpl pr pk) (xmssRecoverTraceM pr p0 sigs.head fMsg)) := rfl
+      rw [hhd] at hw ⊢
+      dsimp only at hw ⊢
+      rw [hroot_tbl] at hw
+      rw [hroot_hyb]
+      split at hw
+      · rename_i hrm
+        rw [Option.map_eq_some_iff] at hw
+        obtain ⟨xw, hxw, hxeq⟩ := hw
+        have hxweq : xw = .wots (.fPreimage c step val) := by
+          have := congrArg SLHDSA.Security.HypertreeWitness.witness hxeq; exact this
+        subst hxweq
+        unfold xmssWitnessFromTrace at hxw
+        dsimp only at hxw
+        rw [hwots_tbl] at hxw
+        rw [ite_eq_left hrm, hwots_hyb]
+        split at hxw
+        · rename_i hwpk
+          rw [ite_eq_left hwpk.symm]
+          rw [Option.map_eq_some_iff] at hxw
+          obtain ⟨ww, hww, hwweq⟩ := hxw
+          have : ww = .fPreimage c step val := by cases hwweq; rfl
+          subst this
+          rw [htr.1, htr.2.2.2.1, htr.2.2.2.2.1] at hww
+          have hpre := wotsPreFromTrace_isSome_of_wotsWitnessFromTrace pr pk u tbl htbl p0
+            sigs.head.wots fMsg hMsg hww
+          rw [htr.1, htr.2.2.2.2.1, ← hMsg_eq, hspec.2.2.2.2.2.1 p0, ← hMsg_eq,
+            ← wotsLeafAdrs_eq_wotsInstanceAdrs']
+          cases hopt : wotsPreFromTrace pr fMsg hMsg
+              (SLHDSA.wotsSign (prEager pr) hMsg u pk (wotsLeafAdrs p0.toAdrs p0.leaf.val))
+              (Id.run (simulateQ (thRealImpl pr pk)
+                (wotsRecoverTraceM pr sigs.head.wots fMsg (wotsLeafAdrs p0.toAdrs p0.leaf.val)))).2.2 with
+          | none => dsimp only at hpre; rw [hopt] at hpre; simp at hpre
+          | some t => rcases t with ⟨_, _, _⟩; rfl
+        · rw [Option.map_eq_some_iff] at hxw
+          obtain ⟨_, _, hcontra⟩ := hxw; cases hcontra
+      · cases hw
     | more layers _ ih =>
-      intro p0 hrem fMsg hMsg hMsg_eq hMsg_hon sigs hrecTop
-      have hroot_hon : (hyb.tbl (xmssNodeAdrs p0.toAdrs vp.sl.params.hp 0)).getD default =
+      intro p0 hrem fMsg hMsg hMsg_eq hMsg_hon sigs ℓ' hw
+      have hroot_hyb : (hyb.tbl (xmssNodeAdrs p0.toAdrs vp.sl.params.hp 0)).getD default =
           SLHDSA.xmssRoot (prEager pr) u pk p0.toAdrs := by
         have h := hspec.2.2.2.1 (LayerTreeCoord.ofPosition p0) vp.sl.params.hp 0 vp.valid.hp_pos le_rfl (by simp)
         rw [LayerTreeCoord.ofPosition_toAdrs] at h
         rw [h, Option.getD_some, honestVal_eq_xmssRoot]
-      have hwots_hon : (hyb.tbl (wotsPkAdrs (wotsInstanceAdrs p0))).getD default =
-          SLHDSA.xmssLeaf (prEager pr) u pk p0.toAdrs p0.leaf.val := by
-        rw [hspec.2.2.1 p0, Option.getD_some, SLHDSA.xmssLeaf_eq_wotsPkGen,
-          wotsLeafAdrs_eq_wotsInstanceAdrs', honestVal_eq_wotsPkGen]
-      have hfw_eq :
-          SLHDSA.Security.findWotsWitness (prEager pr) sigs.head.wots fMsg (hyb.wotsSig p0) (hyb.wotsMsg p0) pk (wotsInstanceAdrs p0) =
-          SLHDSA.Security.findWotsWitness (prEager pr) sigs.head.wots fMsg
-            (SLHDSA.wotsSign (prEager pr) hMsg u pk (wotsLeafAdrs p0.toAdrs p0.leaf.val)) hMsg pk
-            (wotsLeafAdrs p0.toAdrs p0.leaf.val) := by
-        rw [wotsLeafAdrs_eq_wotsInstanceAdrs', hMsg_eq, ← hspec.2.2.2.2.2.1 p0]
-      unfold findHybWotsPreWalk
-      dsimp only
-      rw [hroot_hon]
-      by_cases hr : SLHDSA.xmssPkFromSig (prEager pr) p0.leaf.val sigs.head fMsg pk p0.toAdrs =
+      have hroot_tbl : (tbl (xmssNodeAdrs p0.toAdrs vp.sl.params.hp 0)).getD default =
+          SLHDSA.xmssRoot (prEager pr) u pk p0.toAdrs := by
+        have hmem : xmssNodeAdrs p0.toAdrs vp.sl.params.hp 0 ∈ constructionAddresses vp.sl := by
+          rw [mem_constructionAddresses_iff]
+          refine Or.inr (Or.inr (Or.inr (Or.inr (Or.inr ?_))))
+          rw [← LayerTreeCoord.ofPosition_toAdrs p0]
+          exact mem_xmssNodeAddresses vp.sl (LayerTreeCoord.ofPosition p0) vp.valid.hp_pos le_rfl (by simp)
+        rw [htbl _ hmem, Option.getD_some, honestVal_eq_xmssRoot]
+      have hwots_hyb : (hyb.tbl (wotsPkAdrs (wotsInstanceAdrs p0))).getD default =
+          SLHDSA.wotsPkGen (prEager pr) u pk (wotsLeafAdrs p0.toAdrs p0.leaf.val) := by
+        rw [hspec.2.2.1 p0, Option.getD_some, wotsLeafAdrs_eq_wotsInstanceAdrs', honestVal_eq_wotsPkGen]
+      have hwots_tbl : (tbl (wotsPkAdrs (wotsLeafAdrs p0.toAdrs p0.leaf.val))).getD default =
+          SLHDSA.wotsPkGen (prEager pr) u pk (wotsLeafAdrs p0.toAdrs p0.leaf.val) := by
+        have hmem : wotsPkAdrs (wotsLeafAdrs p0.toAdrs p0.leaf.val) ∈ constructionAddresses vp.sl := by
+          rw [mem_constructionAddresses_iff, wotsLeafAdrs_eq_wotsInstanceAdrs']
+          exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inl (mem_wotsPkAddresses vp.sl p0)))))
+        rw [htbl _ hmem, Option.getD_some, honestVal_eq_wotsPkGen]
+      have htr := simulateQ_xmssRecoverTraceM_spec pr pk p0 sigs.head fMsg
+      have hhd : ∀ {α : Type} {n : ℕ} (a : α) (v : Vector α n), (v.insertIdx 0 a).head = a :=
+        fun _ _ => by simp [Vector.head]
+      have htl : ∀ {α : Type} {n : ℕ} (a : α) (v : Vector α n), (v.insertIdx 0 a).tail = v :=
+        fun _ _ => by apply Vector.ext; intro i hi; simp [Vector.tail_eq_cast_extract]
+      simp only [htRecoverTraceM, simulateQ_bind, Id.run_bind, simulateQ_pure, Id.run_pure,
+        htWitnessFromTrace, findHybWotsPreFromTrace] at hw ⊢
+      rw [hhd, htl] at hw ⊢
+      rw [hroot_tbl] at hw
+      rw [hroot_hyb]
+      by_cases hrm : (Id.run (simulateQ (thRealImpl pr pk)
+          (xmssRecoverTraceM pr p0 sigs.head fMsg))).xmssRoot =
           SLHDSA.xmssRoot (prEager pr) u pk p0.toAdrs
-      · rw [ite_eq_left hr, SLHDSA.Security.findHypertreeWitness_eq_of_root _ _ _ _ _ (layers + 1) hrem _ _ _ hr,
-          hwots_hon]
-        by_cases hlf : SLHDSA.xmssLeaf (prEager pr) u pk p0.toAdrs p0.leaf.val =
-            SLHDSA.wotsPkFromSig (prEager pr) sigs.head.wots fMsg pk (wotsLeafAdrs p0.toAdrs p0.leaf.val)
-        · rw [ite_eq_left hlf.symm, SLHDSA.Security.findXmssWitness_eq_wots_of_leaf _ _ _ _ _ _ _ _ hlf, hfw_eq]
-          cases SLHDSA.Security.findWotsWitness (prEager pr) sigs.head.wots fMsg
-              (SLHDSA.wotsSign (prEager pr) hMsg u pk (wotsLeafAdrs p0.toAdrs p0.leaf.val)) hMsg pk
-              (wotsLeafAdrs p0.toAdrs p0.leaf.val) with
-          | none => simp
-          | some w => cases w <;> simp
-        · rw [ite_eq_right (fun h => hlf h.symm),
-            SLHDSA.Security.findXmssWitness_eq_node_of_leaf_ne _ _ _ _ _ _ _ _ hlf]
-          simp
-      · rw [ite_eq_right hr, SLHDSA.Security.findHypertreeWitness_eq_next_of_ne _ _ _ _ _ layers hrem _ _ _ hr]
+      · rw [ite_eq_left hrm, Option.map_eq_some_iff] at hw
+        obtain ⟨xw, hxw, hxeq⟩ := hw
+        have hxweq : xw = .wots (.fPreimage c step val) := by
+          have := congrArg SLHDSA.Security.HypertreeWitness.witness hxeq; exact this
+        subst hxweq
+        unfold xmssWitnessFromTrace at hxw
+        dsimp only at hxw
+        rw [hwots_tbl] at hxw
+        rw [ite_eq_left hrm, hwots_hyb]
+        split at hxw
+        · rename_i hwpk
+          rw [ite_eq_left hwpk.symm]
+          rw [Option.map_eq_some_iff] at hxw
+          obtain ⟨ww, hww, hwweq⟩ := hxw
+          have : ww = .fPreimage c step val := by cases hwweq; rfl
+          subst this
+          rw [htr.1, htr.2.2.2.1, htr.2.2.2.2.1] at hww
+          have hpre := wotsPreFromTrace_isSome_of_wotsWitnessFromTrace pr pk u tbl htbl p0
+            sigs.head.wots fMsg hMsg hww
+          rw [htr.1, htr.2.2.2.2.1, ← hMsg_eq, hspec.2.2.2.2.2.1 p0, ← hMsg_eq,
+            ← wotsLeafAdrs_eq_wotsInstanceAdrs']
+          cases hopt : wotsPreFromTrace pr fMsg hMsg
+              (SLHDSA.wotsSign (prEager pr) hMsg u pk (wotsLeafAdrs p0.toAdrs p0.leaf.val))
+              (Id.run (simulateQ (thRealImpl pr pk)
+                (wotsRecoverTraceM pr sigs.head.wots fMsg (wotsLeafAdrs p0.toAdrs p0.leaf.val)))).2.2 with
+          | none => dsimp only at hpre; rw [hopt] at hpre; simp at hpre
+          | some t => rcases t with ⟨_, _, _⟩; rfl
+        · rw [Option.map_eq_some_iff] at hxw
+          obtain ⟨_, _, hcontra⟩ := hxw; cases hcontra
+      · rw [ite_eq_right hrm, Option.map_eq_some_iff] at hw
+        obtain ⟨hw', hhw', hweq⟩ := hw
+        rcases hw' with ⟨l', w'⟩
+        have hw'eq : w' = .wots (.fPreimage c step val) := by
+          have := congrArg SLHDSA.Security.HypertreeWitness.witness hweq; exact this
+        subst hw'eq
+        rw [ite_eq_right hrm]
         have hd_eq : vp.sl.params.d = vp.params.slParams.d := rfl
         have hnext_msg : SLHDSA.xmssRoot (prEager pr) u pk p0.toAdrs =
             hyb.wotsMsg (p0.next (by omega)) := by
           have := hMsg_hon 1 (by omega)
           simpa [SLHDSA.Security.honestLayerMsg_succ, LayerPosition.advance_next] using this
-        have hrecNext : SLHDSA.GeneralHypertree.recoverFromPosition vp.sl (prEager pr) pk
-            (p0.next (by omega)) (layers + 1) (by simp only [LayerPosition.next_layer_val]; omega)
-            (SLHDSA.xmssPkFromSig (prEager pr) p0.leaf.val sigs.head fMsg pk p0.toAdrs) sigs.tail =
-            SLHDSA.xmssRoot (prEager pr) u pk (SLHDSA.GeneralHypertree.layerAdrs (vp.sl.params.d - 1) 0) := by
-          simpa only [SLHDSA.GeneralHypertree.recoverFromPosition] using hrecTop
-        have hih := ih (p0.next (by omega)) (by simp only [LayerPosition.next_layer_val]; omega)
-          (SLHDSA.xmssPkFromSig (prEager pr) p0.leaf.val sigs.head fMsg pk p0.toAdrs)
-          (SLHDSA.xmssRoot (prEager pr) u pk p0.toAdrs) hnext_msg
+        exact ih (p0.next (by omega)) (by simp only [LayerPosition.next_layer_val]; omega)
+          _ (SLHDSA.xmssRoot (prEager pr) u pk p0.toAdrs) hnext_msg
           (fun j hj => by
             have hj' : p0.layer.val + (j + 1) < vp.sl.params.d := by
               simp only [LayerPosition.next_layer_val] at hj; omega
             have := hMsg_hon (j + 1) hj'
             rw [SLHDSA.Security.honestLayerMsg_next, LayerPosition.advance_next] at this
             exact this)
-          sigs.tail hrecNext
-        rw [hih]
-        constructor
-        · rintro ⟨ℓ, c, step, val, hw⟩
-          exact ⟨⟨ℓ.val + 1, Nat.succ_lt_succ ℓ.isLt⟩, c, step, val, by rw [hw]; rfl⟩
-        · rintro ⟨ℓ, c, step, val, hw⟩
-          rw [Option.map_eq_some_iff] at hw
-          obtain ⟨u', hu', heq⟩ := hw
-          cases u' with
-          | mk l' w' =>
-            simp only [SLHDSA.Security.HypertreeWitness.mk.injEq] at heq
-            exact ⟨l', c, step, val, by rw [hu', heq.2]⟩
-  -- Top-level FORS vs hypertree split
-  unfold findHybWotsPre
-  dsimp only
-  rw [hspec.1]
-  change (if SLHDSA.forsPkFromSig (prEager pr) (toEagerSig pr sig).fors parts.md.toList pk parts.forsAdrs =
-      (hyb.tbl (forsPkAdrs parts.forsAdrs)).getD default then none else _).isSome = true ↔ _
-  rw [hfors_hon]
-  by_cases hfp : SLHDSA.forsPkFromSig (prEager pr) (toEagerSig pr sig).fors parts.md.toList pk parts.forsAdrs =
+          sigs.tail l' hhw'
+  -- Connect top-level `verifyAndExtractTable` to `findHybWotsPre`!
+  unfold verifyAndExtractTable verifyAndExtractTableM at hver hwit
+  simp only [simulateQ_bind, Id.run_bind, simulateQ_pure, Id.run_pure] at hver hwit
+  unfold findHybWotsPre findHybWotsPreM
+  simp only [simulateQ_bind, Id.run_bind, simulateQ_pure, Id.run_pure, hspec.1]
+  have hrootEq : (Id.run (simulateQ (thRealImpl pr pk)
+      (htRecoverTraceM pr (LayerPosition.initial vp.sl parts) vp.sl.params.d (by simp)
+        (Id.run (simulateQ (thRealImpl pr pk)
+          (forsRecoverTraceM pr sig.fors parts.md.toList parts.forsAdrs))).1 sig.hypertree))).1 = pkSl :=
+    of_decide_eq_true hver
+  rw [hfors_hon_tbl] at hwit
+  by_cases hfp : (Id.run (simulateQ (thRealImpl pr pk)
+      (forsRecoverTraceM pr sig.fors parts.md.toList parts.forsAdrs))).1 =
       SLHDSA.forsPkGen (prEager pr) u pk parts.forsAdrs
-  · rw [ite_eq_left hfp, SLHDSA.Security.findWitness_eq_fors_of_pk u ⟨pk, slRootDet pr pk u⟩ msg
-      (toEagerSig pr sig) target (by rwa [hparts_eq])]
-    simp
-  · rw [ite_eq_right hfp, SLHDSA.Security.findWitness_eq_hypertree_of_ne u ⟨pk, slRootDet pr pk u⟩ msg
-      (toEagerSig pr sig) target (by rwa [hparts_eq])]
-    simp only [hparts_eq]
+  · rw [ite_eq_left hfp] at hwit; cases hwit
+  · rw [ite_eq_right hfp, Option.map_eq_some_iff] at hwit
+    obtain ⟨hw', hhw', hweq⟩ := hwit
+    cases hweq
+    have hcond : (Id.run (simulateQ (thRealImpl pr pk)
+        (htRecoverTraceM pr (LayerPosition.initial vp.sl parts) vp.sl.params.d (by simp)
+          (Id.run (simulateQ (thRealImpl pr pk)
+            (forsRecoverTraceM pr sig.fors parts.md.toList parts.forsAdrs))).1 sig.hypertree))).1 = pkSl ∧
+        (Id.run (simulateQ (thRealImpl pr pk)
+          (forsRecoverTraceM pr sig.fors parts.md.toList parts.forsAdrs))).1 ≠
+          (hyb.tbl (forsPkAdrs parts.forsAdrs)).getD default := by
+      rw [hfors_hon_hyb]; exact ⟨hrootEq, hfp⟩
+    change (if _ then _ else none).isSome = true
+    rw [ite_eq_left hcond]
     have h0_eq : SLHDSA.forsPkGen (prEager pr) u pk parts.forsAdrs =
         hyb.wotsMsg (LayerPosition.initial vp.sl parts) := by
       rw [hspec.2.2.2.2.1]
@@ -1983,27 +2046,8 @@ theorem findHybWotsPre_zero_iff [DecidableEq pr.Y] (pk : pr.PkSeed) (u : SlSecAd
               (LayerPosition.atLayer vp.sl parts ⟨j' + 1, hj_lt⟩).leaf.val) = pPrev.toAdrs := by
           rw [htree_eq, show j' = pPrev.layer.val by simp [pPrev]]; rfl
         rw [hadrs]
-    have hrecTop : SLHDSA.GeneralHypertree.recoverFromPosition vp.sl (prEager pr) pk
-        (LayerPosition.initial vp.sl parts) vp.sl.params.d (by simp)
-        (SLHDSA.forsPkFromSig (prEager pr) (toEagerSig pr sig).fors parts.md.toList pk parts.forsAdrs)
-        (toEagerSig pr sig).hypertree =
-        SLHDSA.xmssRoot (prEager pr) u pk (SLHDSA.GeneralHypertree.layerAdrs (vp.sl.params.d - 1) 0) := by
-      have hcases := SLHDSA.Security.verifyInternal_cases (vp := vp.sl) (prims := prEager pr)
-        u msg (toEagerSig pr sig) ⟨pk, slRootDet pr pk u⟩ hverify
-      rw [hparts_eq] at hcases
-      rcases hcases with heq | ⟨_, hroot⟩
-      · exact absurd heq hfp
-      · rw [slRootDet_eq_prEager_root] at hroot
-        exact SLHDSA.Security.recoverFromPosition_of_pkFromSig vp.sl (prEager pr) u pk parts _ _ hroot
-    rw [hwalk vp.sl.params.d (LayerPosition.initial vp.sl parts) (by simp) _ _ h0_eq hhon_all
-      (toEagerSig pr sig).hypertree hrecTop]
-    constructor
-    · rintro ⟨ℓ, c, step, val, hw⟩; exact ⟨ℓ, c, step, val, by rw [hw]; rfl⟩
-    · rintro ⟨ℓ, c, step, val, hw⟩
-      rw [Option.map_eq_some_iff] at hw
-      obtain ⟨w', hw', heq⟩ := hw
-      cases heq
-      exact ⟨ℓ, c, step, val, hw'⟩
+    exact hwalk vp.sl.params.d (LayerPosition.initial vp.sl parts) (by simp) _ _ h0_eq hhon_all
+      sig.hypertree ℓ hhw'
 
 end ZeroAndSound
 
@@ -3313,7 +3357,7 @@ theorem B_ud_exp {D E : Type} (sfStage : SfStage1 pr D E)
     (fun hyb => do let o ← stage2 d (sfStage.sfDet d pk) pk u hyb; return isHybWotsPre pr pk hyb o)]
 
 /-- Extraction of `SM-PRE` answer from Stage-2 output `o` and Stage-1 `savedT`. -/
-def extractPre (pk : pr.PkSeed) (hyb : HybTree pr) (savedT : List Adrs)
+noncomputable def extractPre (pk : pr.PkSeed) (hyb : HybTree pr) (savedT : List Adrs)
     (o : Option (List Byte × Stateless.Sig pr)) : ℕ × pr.Y :=
   match o with
   | some (msg, sig) =>

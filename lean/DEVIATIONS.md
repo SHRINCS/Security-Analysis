@@ -353,13 +353,18 @@ Departures:
     stateless queries are forwarded to ITSR).
   - **Stage-2 extraction & time/budget scope.** As in §4.5, running time is not modelled, VCVio's
     collection games carry no `IsQueryBoundP` budgets on collection queries, and in Claim 4.15
-    stateful signing / `PK.sf` still runs in Stage 2 (`stageHyb`). In `PostPrf.lean`, Stage-2
-    signing (`slSignTable`) makes zero `Th_λ` evaluations, and `B_ud`/`B_pre` extract directly from
-    `HybTree`, while the 7 TCR/DSPR extractors (`routedTcrAdv`, `B_dsprF_fors`) currently call
-    `extractedWitness` rather than reading `vt.2` directly (scheduled for table-driven extraction
-    and explicit `Th_λ` complexity tracking). In `B_dsprF_fors`, non-winning runs output an
-    out-of-range index `savedQ.length`, which returns `false` in both `SM_DT_DSPR_Experiment` and
-    `SM_DT_DSPR_SPExperiment` (net advantage identical to `[BHK+19]`'s `(0, true)` fallback).
+    stateful signing / `PK.sf` still runs in Stage 2 (`stageHyb`). On the stateless side
+    (`Slhdsa/TableExtract.lean`, `Slhdsa/WotsHybrid.lean`, `Slhdsa/PostPrf.lean`), all 9 stateless
+    collection reductions (`B_ud`, `B_pre`, `B_tcrF_wots`, `B_tcrH_xmss`, `B_tcrThK`, `B_tcrThLsl`,
+    `B_tcrH_fors`, `B_tcrF_fors`, `B_dsprF_fors`) perform zero `Th_λ` evaluations during Stage-2
+    signing (`slSignTable` / `hybSign`), and perform Stage-2 verification and witness extraction
+    directly against the precomputed Stage-1 table (`vt` / `HybTree`) in a single explicit-oracle
+    pass (`verifyAndExtractTableM` / `findHybWotsPreM`, bounded by `Vsl = 2741` `Th_λ` queries via
+    `verifyAndExtractTableM_queryBound` / `findHybWotsPreM_queryBound`, zero `slRootDet` /
+    `forsPkGen` / `xmssRoot` recomputation). In `B_dsprF_fors`, non-winning runs output the
+    strictly in-range fallback `(0, true)` (`0 < qForsLeaf vp`, `routedTargets_forsLeaf_pos`),
+    complying with Main Paper Definition 4.10 (`j ∈ [|Q|]`) while cancelling the shared
+    `Pr[fallback ∧ SP(Q[0])]` term identically in `SM_DT_DSPR_Advantage`.
     `B₀(A_F)` and `B₁⁺` attack `H_msg^sf` (not `Th_λ`).
 - **Hedged mode and message encoding (`enc.Injective`). Forced (proof) for Claim 4.16; automatic in
   the document's model.**

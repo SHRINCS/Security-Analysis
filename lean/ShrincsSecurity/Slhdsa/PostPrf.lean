@@ -888,157 +888,31 @@ noncomputable def chosenForsTree (pk : pr.PkSeed) (pkSl : pr.Y)
     (itLog.toFinset.image (Notions.itsrG (slHmsg pr) (slMap vp)))
     (Notions.itsrG (slHmsg pr) (slMap vp) (sig.randomness, (pk, pkSl, msg)))
 
-/-- Exposed FORS per-tree collision finder (mirroring `SLHDSA.Security.findForsTreeCollision`). -/
-noncomputable def slFindForsTreeCollision [DecidableEq pr.Y]
-    (sig : SLHDSA.ForsSigCore vp.sl.params (prEager pr).core) (md : List Byte)
-    (u : SlSecAdrs vp → pr.Y) (pk : pr.PkSeed) (adrs : Adrs) (i : Fin vp.sl.params.k) :
-    Option (ForsWitness vp.sl.params (prEager pr)) :=
-  let idx := forsSigLeafIndex vp.sl.params md i.val
-  let y := (prEager pr).F pk (forsNodeAdrs adrs 0 idx) (sig[i.val]).sk
-  if forsLeaf (prEager pr) u pk adrs idx = y then none
-  else
-    (PerfectMerkleTree.findCollision (forsLeaf (prEager pr) u pk adrs)
-      (forsNodeHash (prEager pr) pk adrs) idx y (sig[i.val]).auth.toList).map
-      fun w => .hCollision i w.1 w.2.2
-
-/-- Exposed FORS witness extractor (mirroring `SLHDSA.Security.findForsWitness`): depends on `u`
-only through `forsHonestRoots` and `forsLeaf`, and honors `target` on the `.fPreimage` arm. -/
-noncomputable def slFindForsWitness [DecidableEq pr.Y]
-    (sig : SLHDSA.ForsSigCore vp.sl.params (prEager pr).core) (md : List Byte)
-    (u : SlSecAdrs vp → pr.Y) (pk : pr.PkSeed) (adrs : Adrs) (target : Fin vp.sl.params.k) :
-    ForsWitness vp.sl.params (prEager pr) :=
-  if forsRecoveredRoots (prEager pr) sig md pk adrs = forsHonestRoots (prEager pr) u pk adrs then
-    ((List.finRange vp.sl.params.k).findSome?
-      (slFindForsTreeCollision pr sig md u pk adrs)).getD
-      (.fPreimage target (sig[target.val]).sk)
-  else .tlCollision (forsRecoveredRoots (prEager pr) sig md pk adrs)
-
-private theorem slForsRecoveredRoot_climb
-    (sig : SLHDSA.ForsSigCore vp.sl.params (prEager pr).core) (md : List Byte)
-    (u : SlSecAdrs vp → pr.Y) (pk : pr.PkSeed) (adrs : Adrs) (i : Fin vp.sl.params.k)
-    (hroot : (forsRecoveredRoots (prEager pr) sig md pk adrs)[i.val] =
-      (forsHonestRoots (prEager pr) u pk adrs)[i.val]) :
-    PerfectMerkleTree.climb (forsNodeHash (prEager pr) pk adrs)
-        (forsSigLeafIndex vp.sl.params md i.val)
-        ((prEager pr).F pk (forsNodeAdrs adrs 0 (forsSigLeafIndex vp.sl.params md i.val)) (sig[i.val]).sk)
-        (sig[i.val]).auth.toList =
-      PerfectMerkleTree.merkleRoot (forsLeaf (prEager pr) u pk adrs)
-        (forsNodeHash (prEager pr) pk adrs) vp.sl.params.a
-        (forsSigLeafIndex vp.sl.params md i.val / 2 ^ vp.sl.params.a) := by
-  rw [forsSigLeafIndex_div_pow_a vp.sl.params md i.val]
-  rw [forsRecoveredRoots_getElem, forsHonestRoots_getElem, SLHDSA.forsRoot_eq_merkleRoot] at hroot
-  exact hroot
-
-private theorem slFindForsTreeCollision_sound [DecidableEq pr.Y]
-    (sig : SLHDSA.ForsSigCore vp.sl.params (prEager pr).core) (md : List Byte)
-    (u : SlSecAdrs vp → pr.Y) (pk : pr.PkSeed) (adrs : Adrs) (i : Fin vp.sl.params.k)
-    (hroot : (forsRecoveredRoots (prEager pr) sig md pk adrs)[i.val] =
-      (forsHonestRoots (prEager pr) u pk adrs)[i.val])
-    {w : ForsWitness vp.sl.params (prEager pr)}
-    (hw : slFindForsTreeCollision pr sig md u pk adrs i = some w) :
-    w.Valid u pk adrs md := by
-  unfold slFindForsTreeCollision at hw
-  dsimp only at hw
-  split at hw
-  · exact absurd hw (by simp)
-  · rename_i hleaf
-    rw [Option.map_eq_some_iff] at hw
-    obtain ⟨u', hu', rfl⟩ := hw
-    have hlen : (sig[i.val]).auth.toList.length = vp.sl.params.a := by simp
-    have hclimb := slForsRecoveredRoot_climb pr sig md u pk adrs i hroot
-    obtain ⟨z, c, hor⟩ := PerfectMerkleTree.findCollision_oriented
-      (forsLeaf (prEager pr) u pk adrs) (forsNodeHash (prEager pr) pk adrs) vp.sl.params.a
-      (forsSigLeafIndex vp.sl.params md i.val) _ _ hlen hclimb hleaf
-    rw [hor, Option.some.injEq] at hu'
-    subst hu'
-    obtain ⟨hzpos, hzle, hne, hcoll⟩ := PerfectMerkleTree.findCollision_sound
-      (forsLeaf (prEager pr) u pk adrs) (forsNodeHash (prEager pr) pk adrs) vp.sl.params.a
-      (forsSigLeafIndex vp.sl.params md i.val) _ _ hlen z _ c hor
-    rw [ForsWitness.valid_hCollision]
-    refine ⟨hzpos, hzle, ?_, ?_⟩
-    · rw [forsHonestChildren_eq]; exact hne
-    · rw [forsHonestChildren_eq]
-      simpa only [SLHDSA.forsNodeHash_eq_h, PerfectMerkleTree.honestChildren] using hcoll
-
-private theorem slFindForsWitness_sound [DecidableEq pr.Y]
-    (sig : SLHDSA.ForsSigCore vp.sl.params (prEager pr).core) (md : List Byte)
-    (u : SlSecAdrs vp → pr.Y) (pk : pr.PkSeed) (adrs : Adrs) (target : Fin vp.sl.params.k)
-    (hpk : forsPkFromSig (prEager pr) sig md pk adrs = forsPkGen (prEager pr) u pk adrs) :
-    (slFindForsWitness pr sig md u pk adrs target).Valid u pk adrs md := by
-  unfold slFindForsWitness
-  split
-  · rename_i hroots
-    rcases hfind : (List.finRange vp.sl.params.k).findSome?
-        (slFindForsTreeCollision pr sig md u pk adrs) with _ | w
-    · rw [Option.getD_none, ForsWitness.valid_fPreimage]
-      rw [List.findSome?_eq_none_iff] at hfind
-      have hnone := hfind target (List.mem_finRange target)
-      have hleaf : forsLeaf (prEager pr) u pk adrs (forsSigLeafIndex vp.sl.params md target.val) =
-          (prEager pr).F pk (forsNodeAdrs adrs 0 (forsSigLeafIndex vp.sl.params md target.val))
-            (sig[target.val]).sk := by
-        by_contra hne
-        have hlen : (sig[target.val]).auth.toList.length = vp.sl.params.a := by simp
-        have hclimb := slForsRecoveredRoot_climb pr sig md u pk adrs target (by rw [hroots])
-        obtain ⟨z, c, hor⟩ := PerfectMerkleTree.findCollision_oriented
-          (forsLeaf (prEager pr) u pk adrs) (forsNodeHash (prEager pr) pk adrs) vp.sl.params.a
-          (forsSigLeafIndex vp.sl.params md target.val) _ _ hlen hclimb hne
-        unfold slFindForsTreeCollision at hnone
-        simp only [hne, ite_false, hor, Option.map_some] at hnone
-        cases hnone
-      exact forsLeafPreimage (prEager pr) u pk adrs _ _ hleaf
-    · rw [Option.getD_some]
-      obtain ⟨i, -, hi⟩ := List.exists_of_findSome?_eq_some hfind
-      exact slFindForsTreeCollision_sound pr sig md u pk adrs i (by rw [hroots]) hi
-  · rename_i hroots
-    rw [ForsWitness.valid_tlCollision]
-    exact ⟨hroots, forsRootsBinding (prEager pr) sig md u pk adrs hpk⟩
-
 /-- Witness extracted from `(pk, u, out, st)` when `out = some (msg, sig)`:
-uses `slFindForsWitness` on the FORS arm and VCVio's `findWitness` on the hypertree arm. -/
+single-pass table-driven `verifyAndExtractTable` on `slVirtualTreeDet pr pk u` (`≤ V_sl` `Th_λ` queries). -/
 noncomputable def extractedWitness [DecidableEq pr.Y] (pk : pr.PkSeed) (u : SlSecAdrs vp → pr.Y)
     (out : Option (List Byte × Stateless.Sig pr)) (st : SlSignSt pr) :
     Option (Witness vp.sl (prEager pr)) :=
   match out with
   | none => none
   | some (msg, sig) =>
-      let pkSl := slRootDet pr pk u
-      let parts := schemeParts vp.sl (prEager pr) msg (toEagerSig pr sig) ⟨pk, pkSl⟩
-      let target := chosenForsTree pr pk pkSl st.itLog msg sig
-      if forsPkFromSig (prEager pr) (toEagerSig pr sig).fors parts.md.toList pk parts.forsAdrs =
-          forsPkGen (prEager pr) u pk parts.forsAdrs then
-        some (.fors (slFindForsWitness pr (toEagerSig pr sig).fors parts.md.toList u pk
-          parts.forsAdrs target))
-      else
-        findWitness (vp := vp.sl) (prims := prEager pr) u ⟨pk, pkSl⟩ msg (toEagerSig pr sig) target
+      let vt := slVirtualTreeDet pr pk u
+      let target := chosenForsTree pr pk vt.1 st.itLog msg sig
+      (verifyAndExtractTable pr pk vt.1 vt.2 u msg sig target).2
 
 private theorem extractedWitness_sound [DecidableEq pr.Y] (pk : pr.PkSeed) (u : SlSecAdrs vp → pr.Y)
     (msg : List Byte) (sig : Stateless.Sig pr) (st : SlSignSt pr)
     {w : Witness vp.sl (prEager pr)}
     (hw : extractedWitness pr pk u (some (msg, sig)) st = some w) :
     w.Valid u ⟨pk, slRootDet pr pk u⟩ msg (toEagerSig pr sig) := by
+  have hvt := slVirtualTreeDet_spec pr pk u
+  have hpk : (slVirtualTreeDet pr pk u).1 = slRootDet pr pk u :=
+    hvt.1.trans (slRootDet_eq_honestVal pr pk u).symm
   unfold extractedWitness at hw
   dsimp only at hw
-  split at hw
-  · rename_i hfp
-    simp only [Option.some.injEq] at hw
-    subst hw
-    rw [Witness.valid_fors]
-    exact slFindForsWitness_sound pr _ _ u pk _ _ hfp
-  · exact findWitness_sound (vp := vp.sl) (prims := prEager pr) u ⟨pk, slRootDet pr pk u⟩
-      msg (toEagerSig pr sig) (chosenForsTree pr pk (slRootDet pr pk u) st.itLog msg sig) hw
-
-private theorem extractedWitness_eq_hypertree_iff [DecidableEq pr.Y] (pk : pr.PkSeed)
-    (u : SlSecAdrs vp → pr.Y) (msg : List Byte) (sig : Stateless.Sig pr) (st : SlSignSt pr)
-    (hw' : HypertreeWitness vp.sl (prEager pr) vp.sl.params.d) :
-    extractedWitness pr pk u (some (msg, sig)) st = some (.hypertree hw') ↔
-      findWitness (vp := vp.sl) (prims := prEager pr) u ⟨pk, slRootDet pr pk u⟩ msg
-        (toEagerSig pr sig) (chosenForsTree pr pk (slRootDet pr pk u) st.itLog msg sig) =
-        some (.hypertree hw') := by
-  unfold extractedWitness; dsimp only
-  split_ifs with hfp
-  · rw [findWitness_eq_fors_of_pk u ⟨pk, slRootDet pr pk u⟩ msg (toEagerSig pr sig) _ hfp]
-    simp
-  · rfl
+  rw [hpk] at hw
+  exact verifyAndExtractTable_sound pr pk (slRootDet pr pk u) (slVirtualTreeDet pr pk u).2 u
+    hvt.2.2 msg sig _ hw
 
 /-- The 7 non-ITSR witness events on `(pk, u, out, st)`:
 1. `EvTcrThK`: FORS `Th_k` collision (`q₅`)
@@ -1103,19 +977,13 @@ theorem postPrfWin_cases [DecidableEq pr.Y] (hinj : Function.Injective pr.yToByt
   · exact Or.inl hitsr
   · rcases out with _ | ⟨msg, sig⟩
     · exact hwin.elim
-    · have hver : SLHDSA.GeneralScheme.verifyInternal vp.sl (prEager pr) msg (toEagerSig pr sig)
-          ⟨pk, SLHDSA.GeneralHypertree.root vp.sl (prEager pr) u pk⟩ = true := by
-        rw [← slRootDet_eq_prEager_root, verifyInternal_prEager_eq]
-        exact hwin.2
-      have hisSome := findWitness_isSome (vp := vp.sl) (prims := prEager pr)
-        (prEager_byteLaws pr hinj) u pk msg (toEagerSig pr sig)
-        (chosenForsTree pr pk (slRootDet pr pk u) st.itLog msg sig) hver
-      rw [← slRootDet_eq_prEager_root] at hisSome
+    · have hvt := slVirtualTreeDet_spec pr pk u
+      have hpk : (slVirtualTreeDet pr pk u).1 = slRootDet pr pk u :=
+        hvt.1.trans (slRootDet_eq_honestVal pr pk u).symm
       have hexSome : (extractedWitness pr pk u (some (msg, sig)) st).isSome = true := by
-        unfold extractedWitness; dsimp only
-        split_ifs
-        · rfl
-        · exact hisSome
+        unfold extractedWitness; dsimp only; rw [hpk]
+        exact verifyAndExtractTable_isSome pr hinj pk (slVirtualTreeDet pr pk u).2 u hvt.2.2
+          msg sig _ hwin.2
       obtain ⟨w, hex⟩ := Option.isSome_iff_exists.1 hexSome
       cases w with
       | fors fw =>
@@ -1172,15 +1040,16 @@ def sfTcrCall (mem : Primitives.Member) (p : ℕ) :
 
 /-- **Generic routed `SM-TCR` reduction** for a stateless role `(mem, isTarget, p)`:
 * **Stage 1:** samples `d ← sfStage.g₁`, runs `sfStage.sfRun` via `O_coll`, samples `u ← $ᵗ _`,
-  and runs `slVirtualTreeM` with `routedTcrCall` wrapped in `recordTcrImpl` (precomputing `(pkSl, tbl)`
+  and runs `slVirtualTreeM` with `routedTcrCall` wrapped in `recordTcrImpl` (precomputing `vt = (pkSl, tbl)`
   and recording every accepted challenge `(a, msg)` in `savedQ`).
 * **Stage 2:** simulates `adv` with `slSignTable` (ZERO `Th_λ` evaluations!), then calls `extract`
-  to pick a `(targetIdx, collidingMsg)` pair. -/
+  on `(pk, u, vt, savedQ, res.1, res.2)` using the precomputed table `vt` (`≤ V_sl` `Th_λ` queries!). -/
 noncomputable def routedTcrAdv {D E : Type} {qs : ℕ}
     (sfStage : SfStage1 pr D E) (adv : PostPrfAdv pr D E qs)
     (mem : Primitives.Member) [DecidableEq (pr.MemberMsg mem)]
     (isTarget : Adrs → Bool) (p : ℕ)
-    (extract : pr.PkSeed → (SlSecAdrs vp → pr.Y) → List (Adrs × pr.MemberMsg mem) →
+    (extract : pr.PkSeed → (SlSecAdrs vp → pr.Y) → (pr.Y × (Adrs → Option pr.Y)) →
+      List (Adrs × pr.MemberMsg mem) →
       Option (List Byte × Stateless.Sig pr) → SlSignSt pr → ℕ × pr.MemberMsg mem) :
     SM_DT_TCR_Adversary (Notions.smTcrMemberProblem (pr.member ($ᵗ pr.PkSeed) mem) pr.collection p) where
   State := D × E × (SlSecAdrs vp → pr.Y) × (pr.Y × (Adrs → Option pr.Y)) ×
@@ -1197,7 +1066,7 @@ noncomputable def routedTcrAdv {D E : Type} {qs : ℕ}
   forge st pk := do
     let (d, sf, u, vt, savedQ) := st
     let res ← runPostPrf pr adv d sf pk vt.1 (slSignTable pr vt.2 pk vt.1 u)
-    return extract pk u savedQ res.1 res.2
+    return extract pk u vt savedQ res.1 res.2
 
 /-- **Exact SM-TCR advantage of `routedTcrAdv`** (in terms of `postPrfExp` and `routedTargets`). -/
 theorem routedTcrAdv_advantage {D E : Type} {qs : ℕ}
@@ -1207,13 +1076,15 @@ theorem routedTcrAdv_advantage {D E : Type} {qs : ℕ}
     (hmem : ∀ a ∈ constructionAddresses vp.sl, isTarget a = true →
       ∀ u tbl, ∃ msg, evalNodeInput pr u tbl a = some ⟨mem, msg⟩)
     (hp : (slTreeAddresses vp).countP isTarget ≤ p)
-    (extract : pr.PkSeed → (SlSecAdrs vp → pr.Y) → List (Adrs × pr.MemberMsg mem) →
+    (extract : pr.PkSeed → (SlSecAdrs vp → pr.Y) → (pr.Y × (Adrs → Option pr.Y)) →
+      List (Adrs × pr.MemberMsg mem) →
       Option (List Byte × Stateless.Sig pr) → SlSignSt pr → ℕ × pr.MemberMsg mem) :
     SM_DT_TCR_Advantage (routedTcrAdv pr sfStage adv mem isTarget p extract) =
       Pr{let z ← postPrfExp pr sfStage adv}[
         Fxmss.tcrWin (Notions.smTcrMemberProblem (pr.member ($ᵗ pr.PkSeed) mem) pr.collection p)
           z.1 (routedTargets pr z.1 z.2.1 mem isTarget)
-          (extract z.1 z.2.1 (routedTargets pr z.1 z.2.1 mem isTarget) z.2.2.1 z.2.2.2) = true] := by
+          (extract z.1 z.2.1 (slVirtualTreeDet pr z.1 z.2.1)
+            (routedTargets pr z.1 z.2.1 mem isTarget) z.2.2.1 z.2.2.2) = true] := by
   set prob := Notions.smTcrMemberProblem (pr.member ($ᵗ pr.PkSeed) mem) pr.collection p
   unfold SM_DT_TCR_Advantage postPrfExp
   rw [prEvent_eq_evalDist_bind]
@@ -1226,7 +1097,7 @@ theorem routedTcrAdv_advantage {D E : Type} {qs : ℕ}
         let pkSl := slRootDet pr pk u
         let res ← runPostPrf pr adv d (sfStage.sfDet d pk) pk pkSl (slSignDet pr pk pkSl u)
         return Fxmss.tcrWin prob pk (routedTargets pr pk u mem isTarget)
-          (extract pk u (routedTargets pr pk u mem isTarget) res.1 res.2)) := by
+          (extract pk u (slVirtualTreeDet pr pk u) (routedTargets pr pk u mem isTarget) res.1 res.2)) := by
     unfold SM_DT_TCR_Experiment
     refine EvalDistEq.bind_right _ fun pk => ?_
     simp only [routedTcrAdv]
@@ -1290,7 +1161,7 @@ theorem routedTcrAdv_advantage {D E : Type} {qs : ℕ}
     rw [hsign_eq, hpkSl]
     refine EvalDistEq.bind_right _ fun res => ?_
     simp only [Fxmss.tcrWin]
-    cases (routedTargets pr pk u mem isTarget)[(extract pk u (routedTargets pr pk u mem isTarget) res.1 res.2).1]? with
+    cases (routedTargets pr pk u mem isTarget)[(extract pk u (slVirtualTreeDet pr pk u) (routedTargets pr pk u mem isTarget) res.1 res.2).1]? with
     | none => rfl
     | some tm => rfl
   have hmeas := evalDistEq_apply_true hexp
@@ -1300,16 +1171,16 @@ theorem routedTcrAdv_advantage {D E : Type} {qs : ℕ}
   refine bind_congr fun pk => bind_congr fun d => bind_congr fun u => bind_congr fun res => ?_
   congr 1
   cases Fxmss.tcrWin prob pk (routedTargets pr pk u mem isTarget)
-    (extract pk u (routedTargets pr pk u mem isTarget) res.1 res.2) <;> simp
+    (extract pk u (slVirtualTreeDet pr pk u) (routedTargets pr pk u mem isTarget) res.1 res.2) <;> simp
 
-/-- Helper: index-lookup extractor from a candidate function `cand`. -/
+/-- Helper: index-lookup extractor from a table-driven candidate function `cand`. -/
 noncomputable def idxExtract {M : Type} [Inhabited M]
-    (cand : pr.PkSeed → (SlSecAdrs vp → pr.Y) → Option (List Byte × Stateless.Sig pr) → SlSignSt pr →
-      Option (Adrs × M)) :
-    pr.PkSeed → (SlSecAdrs vp → pr.Y) → List (Adrs × M) →
+    (cand : pr.PkSeed → (SlSecAdrs vp → pr.Y) → (pr.Y × (Adrs → Option pr.Y)) →
+      Option (List Byte × Stateless.Sig pr) → SlSignSt pr → Option (Adrs × M)) :
+    pr.PkSeed → (SlSecAdrs vp → pr.Y) → (pr.Y × (Adrs → Option pr.Y)) → List (Adrs × M) →
       Option (List Byte × Stateless.Sig pr) → SlSignSt pr → ℕ × M :=
-  fun pk u savedQ out st =>
-    match cand pk u out st with
+  fun pk u vt savedQ out st =>
+    match cand pk u vt out st with
     | none => (savedQ.length, default)
     | some (a, msg') => ((savedQ.map Prod.fst).idxOf a, msg')
 
@@ -1324,11 +1195,11 @@ theorem routedTcr_bound_of_witness {D E : Type} {qs : ℕ}
       ∀ u tbl, ∃ msg, evalNodeInput pr u tbl a = some ⟨mem, msg⟩)
     (hp : (slTreeAddresses vp).countP isTarget ≤ p)
     (Ev : pr.PkSeed → (SlSecAdrs vp → pr.Y) → Option (List Byte × Stateless.Sig pr) → SlSignSt pr → Prop)
-    (cand : pr.PkSeed → (SlSecAdrs vp → pr.Y) → Option (List Byte × Stateless.Sig pr) → SlSignSt pr →
-      Option (Adrs × pr.MemberMsg mem))
+    (cand : pr.PkSeed → (SlSecAdrs vp → pr.Y) → (pr.Y × (Adrs → Option pr.Y)) →
+      Option (List Byte × Stateless.Sig pr) → SlSignSt pr → Option (Adrs × pr.MemberMsg mem))
     (hsound : ∀ pk u out st, Ev pk u out st →
       ∃ a msg' honestMsg,
-        cand pk u out st = some (a, msg') ∧
+        cand pk u (slVirtualTreeDet pr pk u) out st = some (a, msg') ∧
         a ∈ constructionAddresses vp.sl ∧
         isTarget a = true ∧
         honestInput pr pk u a = some ⟨mem, honestMsg⟩ ∧
@@ -1376,71 +1247,81 @@ def qWotsPk (vp : ValidatedParams) : ℕ := (wotsPkAddresses vp.sl).length
 def qForsH (vp : ValidatedParams) : ℕ := (forsTreeAddresses vp.sl).length
 def qForsLeaf (vp : ValidatedParams) : ℕ := (forsLeafAddresses vp.sl).length
 
-/-- Helper: candidate extractor for `Th_k` (`EvTcrThK`). -/
+/-- Helper: single-pass table-driven candidate extractor for `Th_k` (`EvTcrThK`). -/
 noncomputable def candThK (pk : pr.PkSeed) (u : SlSecAdrs vp → pr.Y)
+    (vt : pr.Y × (Adrs → Option pr.Y))
     (out : Option (List Byte × Stateless.Sig pr)) (st : SlSignSt pr) :
     Option (Adrs × pr.MemberMsg .thK) :=
   match out with
   | none => none
   | some (msg, sig) =>
-      match extractedWitness pr pk u (some (msg, sig)) st with
+      let target := chosenForsTree pr pk vt.1 st.itLog msg sig
+      match (verifyAndExtractTable pr pk vt.1 vt.2 u msg sig target).2 with
       | some (.fors (.tlCollision rec)) =>
-          let parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk (slRootDet pr pk u) msg)
+          let parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk vt.1 msg)
           some (forsPkAdrs parts.forsAdrs, rec)
       | _ => none
 
-/-- Helper: candidate extractor for FORS internal `H` (`EvTcrHFors`). -/
+/-- Helper: single-pass table-driven candidate extractor for FORS internal `H` (`EvTcrHFors`). -/
 noncomputable def candHFors (pk : pr.PkSeed) (u : SlSecAdrs vp → pr.Y)
+    (vt : pr.Y × (Adrs → Option pr.Y))
     (out : Option (List Byte × Stateless.Sig pr)) (st : SlSignSt pr) :
     Option (Adrs × pr.MemberMsg .H) :=
   match out with
   | none => none
   | some (msg, sig) =>
-      match extractedWitness pr pk u (some (msg, sig)) st with
+      let target := chosenForsTree pr pk vt.1 st.itLog msg sig
+      match (verifyAndExtractTable pr pk vt.1 vt.2 u msg sig target).2 with
       | some (.fors (.hCollision i z c)) =>
-          let parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk (slRootDet pr pk u) msg)
+          let parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk vt.1 msg)
           some (forsNodeAdrs parts.forsAdrs z (forsSigLeafIndex vp.sl.params parts.md.toList i.val / 2 ^ z), c)
       | _ => none
 
-/-- Helper: candidate extractor for XMSS internal `H` (`EvTcrHXmss`). -/
+/-- Helper: single-pass table-driven candidate extractor for XMSS internal `H` (`EvTcrHXmss`). -/
 noncomputable def candHXmss (pk : pr.PkSeed) (u : SlSecAdrs vp → pr.Y)
+    (vt : pr.Y × (Adrs → Option pr.Y))
     (out : Option (List Byte × Stateless.Sig pr)) (st : SlSignSt pr) :
     Option (Adrs × pr.MemberMsg .H) :=
   match out with
   | none => none
   | some (msg, sig) =>
-      match extractedWitness pr pk u (some (msg, sig)) st with
+      let target := chosenForsTree pr pk vt.1 st.itLog msg sig
+      match (verifyAndExtractTable pr pk vt.1 vt.2 u msg sig target).2 with
       | some (.hypertree ⟨ℓ, .hCollision z c⟩) =>
-          let parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk (slRootDet pr pk u) msg)
+          let parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk vt.1 msg)
           let pos := (LayerPosition.initial vp.sl parts).advance ℓ.val (by simp)
           some (xmssNodeAdrs pos.toAdrs z (pos.leaf.val / 2 ^ z), c)
       | _ => none
 
-/-- Helper: candidate extractor for WOTS+ `Th_lsl` (`EvTcrThLsl`). -/
+/-- Helper: single-pass table-driven candidate extractor for WOTS+ `Th_lsl` (`EvTcrThLsl`). -/
 noncomputable def candThLsl (pk : pr.PkSeed) (u : SlSecAdrs vp → pr.Y)
+    (vt : pr.Y × (Adrs → Option pr.Y))
     (out : Option (List Byte × Stateless.Sig pr)) (st : SlSignSt pr) :
     Option (Adrs × pr.MemberMsg .thLsl) :=
   match out with
   | none => none
   | some (msg, sig) =>
-      match extractedWitness pr pk u (some (msg, sig)) st with
+      let target := chosenForsTree pr pk vt.1 st.itLog msg sig
+      match (verifyAndExtractTable pr pk vt.1 vt.2 u msg sig target).2 with
       | some (.hypertree ⟨ℓ, .wots (.tlCollision rec)⟩) =>
-          let parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk (slRootDet pr pk u) msg)
+          let parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk vt.1 msg)
           let pos := (LayerPosition.initial vp.sl parts).advance ℓ.val (by simp)
           some (wotsPkAdrs (wotsLeafAdrs pos.toAdrs pos.leaf.val),
             rec.cast (Params.lsl_eq_len vp.valid).symm)
       | _ => none
 
-/-- Helper: candidate extractor for WOTS+ chain `F` collision (`EvTcrFWots`). -/
+/-- Helper: single-pass table-driven candidate extractor for WOTS+ chain `F` collision (`EvTcrFWots`). -/
 noncomputable def candFWots (pk : pr.PkSeed) (u : SlSecAdrs vp → pr.Y)
+    (vt : pr.Y × (Adrs → Option pr.Y))
     (out : Option (List Byte × Stateless.Sig pr)) (st : SlSignSt pr) :
     Option (Adrs × pr.MemberMsg .F) :=
   match out with
   | none => none
   | some (msg, sig) =>
-      match extractedWitness pr pk u (some (msg, sig)) st with
+      let target := chosenForsTree pr pk vt.1 st.itLog msg sig
+      match (verifyAndExtractTable pr pk vt.1 vt.2 u msg sig target).2 with
       | some (.hypertree ⟨ℓ, .wots (.fCollision c step val)⟩) =>
-          let parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk (slRootDet pr pk u) msg)
+          let parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk vt.1 msg)
           let pos := (LayerPosition.initial vp.sl parts).advance ℓ.val (by simp)
           some ((wotsChainAdrs (wotsLeafAdrs pos.toAdrs pos.leaf.val) c.val).setHashAddress step, val)
       | _ => none
@@ -1486,8 +1367,10 @@ theorem pr_EvTcrThK_le {D E : Type} {qs : ℕ}
     have hp_eq : schemeParts vp.sl (prEager pr) msg (toEagerSig pr sig) ⟨pk, slRootDet pr pk u⟩ = parts :=
       schemeParts_eq vp.sl (prEager pr) msg (toEagerSig pr sig) ⟨pk, slRootDet pr pk u⟩
     rw [hp_eq] at hval
+    have hvt_pk : (slVirtualTreeDet pr pk u).1 = slRootDet pr pk u :=
+      (slVirtualTreeDet_spec pr pk u).1.trans (slRootDet_eq_honestVal pr pk u).symm
     refine ⟨forsPkAdrs parts.forsAdrs, rec, forsHonestRoots (prEager pr) u pk parts.forsAdrs,
-      by simp [candThK, hw, parts],
+      by unfold extractedWitness at hw; dsimp only at hw; simp only [candThK, hw]; rw [hvt_pk],
       (mem_constructionAddresses_iff _).2 (Or.inr (Or.inr (Or.inl (mem_forsRootAddresses_of_parts parts)))),
       rfl, honestInput_forsRoot pr pk u parts.forsAdrs, hval.1, hval.2⟩
 
@@ -1508,9 +1391,11 @@ theorem pr_EvTcrHFors_le {D E : Type} {qs : ℕ}
       schemeParts_eq vp.sl (prEager pr) msg (toEagerSig pr sig) ⟨pk, slRootDet pr pk u⟩
     rw [hp_eq] at hval
     obtain ⟨hz0, hza, hne, hcoll⟩ := hval
+    have hvt_pk : (slVirtualTreeDet pr pk u).1 = slRootDet pr pk u :=
+      (slVirtualTreeDet_spec pr pk u).1.trans (slRootDet_eq_honestVal pr pk u).symm
     refine ⟨forsNodeAdrs parts.forsAdrs z (forsSigLeafIndex vp.sl.params parts.md.toList i.val / 2 ^ z),
       c, forsHonestChildren (prEager pr) u pk parts.forsAdrs z (forsSigLeafIndex vp.sl.params parts.md.toList i.val / 2 ^ z),
-      by simp [candHFors, hw, parts],
+      by unfold extractedWitness at hw; dsimp only at hw; simp only [candHFors, hw]; rw [hvt_pk],
       (mem_constructionAddresses_iff _).2 (Or.inr (Or.inl (mem_forsTreeAddresses_of_parts parts parts.md.toList i hz0 hza))),
       by simp only [isForsH, forsNodeAdrs, Adrs.setTreeIndex, Adrs.setTreeHeight,
            Adrs.setTypeAndClear, AddrType.toCode, Bool.and_eq_true, beq_iff_eq, bne_iff_ne]
@@ -1543,9 +1428,11 @@ theorem pr_EvTcrHXmss_le {D E : Type} {qs : ℕ}
     have hmem_xmss : xmssNodeAdrs pos.toAdrs z (pos.leaf.val / 2 ^ z) ∈ xmssNodeAddresses vp.sl := by
       rw [← LayerTreeCoord.ofPosition_toAdrs pos]
       exact mem_xmssNodeAddresses vp.sl (LayerTreeCoord.ofPosition pos) hz0 hzh hlt_idx
+    have hvt_pk : (slVirtualTreeDet pr pk u).1 = slRootDet pr pk u :=
+      (slVirtualTreeDet_spec pr pk u).1.trans (slRootDet_eq_honestVal pr pk u).symm
     refine ⟨xmssNodeAdrs pos.toAdrs z (pos.leaf.val / 2 ^ z), c,
       xmssHonestChildren (prEager pr) u pk pos.toAdrs z (pos.leaf.val / 2 ^ z),
-      by simp [candHXmss, hw, parts, pos],
+      by unfold extractedWitness at hw; dsimp only at hw; simp only [candHXmss, hw]; rw [hvt_pk],
       (mem_constructionAddresses_iff _).2 (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr hmem_xmss))))),
       by simp [isXmssH, xmssNodeAdrs, Adrs.setTreeIndex, Adrs.setTreeHeight, Adrs.setTypeAndClear, AddrType.toCode, Nat.ne_of_gt hz0],
       honestInput_xmssH pr pk u pos.toAdrs hz0 _,
@@ -1572,10 +1459,12 @@ theorem pr_EvTcrThLsl_le {D E : Type} {qs : ℕ}
     have hmem_wpk : wotsPkAdrs (wotsLeafAdrs pos.toAdrs pos.leaf.val) ∈ wotsPkAddresses vp.sl := by
       rw [wotsLeafAdrs_eq_wotsInstanceAdrs' pos]
       exact mem_wotsPkAddresses vp.sl pos
+    have hvt_pk : (slVirtualTreeDet pr pk u).1 = slRootDet pr pk u :=
+      (slVirtualTreeDet_spec pr pk u).1.trans (slRootDet_eq_honestVal pr pk u).symm
     refine ⟨wotsPkAdrs (wotsLeafAdrs pos.toAdrs pos.leaf.val),
       rec.cast (Params.lsl_eq_len vp.valid).symm,
       (wotsPkGenTops (prEager pr) u pk (wotsLeafAdrs pos.toAdrs pos.leaf.val)).cast (Params.lsl_eq_len vp.valid).symm,
-      by simp [candThLsl, hw, parts, pos],
+      by unfold extractedWitness at hw; dsimp only at hw; simp only [candThLsl, hw]; rw [hvt_pk],
       (mem_constructionAddresses_iff _).2 (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl hmem_wpk))))),
       rfl, honestInput_wotsPk pr pk u _,
       fun h => hval.1 (by have := congrArg (Vector.cast (Params.lsl_eq_len vp.valid)) h; simpa using this),
@@ -1610,9 +1499,11 @@ theorem pr_EvTcrFWots_le {D E : Type} {qs : ℕ}
         wotsStepAddresses vp.sl := by
       rw [wotsLeafAdrs_eq_wotsInstanceAdrs' pos]
       exact mem_wotsStepAddresses vp.sl (pos, c) ⟨step, hstep_lt⟩
+    have hvt_pk : (slVirtualTreeDet pr pk u).1 = slRootDet pr pk u :=
+      (slVirtualTreeDet_spec pr pk u).1.trans (slRootDet_eq_honestVal pr pk u).symm
     refine ⟨(wotsChainAdrs (wotsLeafAdrs pos.toAdrs pos.leaf.val) c.val).setHashAddress step,
       val, _,
-      by simp [candFWots, hw, parts, pos],
+      by unfold extractedWitness at hw; dsimp only at hw; simp only [candFWots, hw]; rw [hvt_pk],
       (mem_constructionAddresses_iff _).2 (Or.inr (Or.inr (Or.inr (Or.inl hmem_ws)))),
       rfl, honestInput_wotsStep pr pk u _ c _ step hstep_ge,
       hne, hcoll⟩
@@ -1627,15 +1518,18 @@ variable {vp : ValidatedParams} (pr : Primitives vp.params)
   [Fintype pr.Y] [DecidableEq pr.Y] [SampleableType pr.Y] [Inhabited pr.Y]
   [DecidableEq pr.PkSeed] [SampleableType pr.PkSeed]
 
-/-- Keyless Stage-2 runner for `WotsHybrid`: runs `adv` with `hybSign pr pk hyb u`, returning
-`some (msg, sig)` if `PostPrfWin` holds (under `hyb.pkSl`) and `none` otherwise. -/
+/-- Keyless Stage-2 runner for `WotsHybrid`: runs `adv` with `hybSign pr pk hyb u`, filtering
+only by freshness `msg ∉ res.2.log` (ZERO `Th_λ` queries! Verification `finalRoot = hyb.pkSl`
+is performed inside `findHybWotsPre` in a single `≤ V_sl` pass). -/
 noncomputable def wotsStage2 {D E : Type} {qs : ℕ}
     (adv : PostPrfAdv pr D E qs) :
     D → E → pr.PkSeed → (SlSecAdrs vp → pr.Y) → HybTree pr →
       ProbComp (Option (List Byte × Stateless.Sig pr)) :=
   fun d sf pk u hyb => do
     let res ← runPostPrf pr adv d sf pk hyb.pkSl (hybSign pr pk hyb u)
-    return if PostPrfWin pr pk hyb.pkSl res.2.log res.1 then res.1 else none
+    return match res.1 with
+      | some (msg, sig) => if msg ∉ res.2.log then some (msg, sig) else none
+      | none => none
 
 omit [Fintype pr.Y] [DecidableEq pr.PkSeed] [SampleableType pr.PkSeed] in
 /-- `wotsStage2` does not depend on `u` at `WOTS_PRF` addresses (`type = 5`). -/
@@ -1676,18 +1570,21 @@ theorem pr_EvPreFWots_le {D E : Type} {qs : ℕ}
     rcases res with ⟨out, st⟩
     rcases out with _ | ⟨msg, sig⟩
     · exact hwin.elim
-    · have hver : SLHDSA.GeneralScheme.verifyInternal vp.sl (prEager pr) msg (toEagerSig pr sig)
-          ⟨pk, slRootDet pr pk u⟩ = true := by
-        rw [verifyInternal_prEager_eq]; exact hwin.2
-      have hfw : findWitness (vp := vp.sl) (prims := prEager pr) u ⟨pk, slRootDet pr pk u⟩ msg
-          (toEagerSig pr sig) (chosenForsTree pr pk (slRootDet pr pk u) st.itLog msg sig) =
-          some (.hypertree ⟨ℓ, .wots (.fPreimage c step val)⟩) :=
-        (extractedWitness_eq_hypertree_iff pr pk u msg sig st _).1 hw
+    · have hvt := slVirtualTreeDet_spec pr pk u
+      have hvt_pk : (slVirtualTreeDet pr pk u).1 = slRootDet pr pk u :=
+        hvt.1.trans (slRootDet_eq_honestVal pr pk u).symm
+      have hw' : (verifyAndExtractTable pr pk (slRootDet pr pk u) (slVirtualTreeDet pr pk u).2 u
+          msg sig (chosenForsTree pr pk (slRootDet pr pk u) st.itLog msg sig)).2 =
+          some (.hypertree ⟨ℓ, .wots (.fPreimage c step val)⟩) := by
+        unfold extractedWitness at hw; dsimp only at hw; rwa [hvt_pk] at hw
+      have hver : (verifyAndExtractTable pr pk (slRootDet pr pk u) (slVirtualTreeDet pr pk u).2 u
+          msg sig (chosenForsTree pr pk (slRootDet pr pk u) st.itLog msg sig)).1 = true := by
+        rw [verifyAndExtractTable_fst pr pk (slRootDet pr pk u) _ u hvt.2.2]
+        exact hwin.2
       have hpre : (findHybWotsPre pr pk (hybTreeDet pr 0 pk u) msg sig).isSome = true :=
-        (findHybWotsPre_zero_iff pr pk u msg sig
-          (chosenForsTree pr pk (slRootDet pr pk u) st.itLog msg sig) hver).2
-          ⟨ℓ, c, step, val, hfw⟩
-      simp [hwin, isHybWotsPre, hpre, hev]
+        findHybWotsPre_zero_of_verifyAndExtractTable pr pk u (slVirtualTreeDet pr pk u).2
+          hvt.2.2 msg sig _ hver hw'
+      simp [hwin.1, isHybWotsPre, hpre, hev]
   · simp [hev]
 
 end WotsPreBound
@@ -1784,31 +1681,108 @@ def sfDsprCall :
       let y ← (liftM (spec.query (.inr (.inr ⟨some i, a, msg⟩))) : OracleComp spec (Option pr.Y))
       return y.getD default
 
-/-- Extract the FORS leaf `(aLeaf*, aSk*, val)` witness when `EvForsPre` holds. -/
+/-- Single-pass table-driven extractor for the FORS leaf `(aLeaf*, val)` witness (`≤ V_sl` `Th_λ`
+queries): checks freshness `msg ∉ st.log`, runs `verifyAndExtractTable` ONCE to obtain both
+`ver` and `wit`, checks `ver = true ∧ ¬ Covered`, and extracts `.fors (.fPreimage i val)`. -/
+noncomputable def candForsPreTable (pk : pr.PkSeed) (u : SlSecAdrs vp → pr.Y)
+    (vt : pr.Y × (Adrs → Option pr.Y))
+    (out : Option (List Byte × Stateless.Sig pr)) (st : SlSignSt pr) :
+    Option (Adrs × pr.Y) :=
+  match out with
+  | none => none
+  | some (msg, sig) =>
+      if msg ∉ st.log then
+        let target := chosenForsTree pr pk vt.1 st.itLog msg sig
+        let r := verifyAndExtractTable pr pk vt.1 vt.2 u msg sig target
+        if r.1 = true ∧ ¬ ITSR.Covered
+            (st.itLog.toFinset.image (Notions.itsrG (slHmsg pr) (slMap vp)))
+            (Notions.itsrG (slHmsg pr) (slMap vp) (sig.randomness, (pk, vt.1, msg))) then
+          match r.2 with
+          | some (.fors (.fPreimage i val)) =>
+              let parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk vt.1 msg)
+              some (forsNodeAdrs parts.forsAdrs 0 (forsSigLeafIndex vp.sl.params parts.md.toList i.val), val)
+          | _ => none
+        else none
+      else none
+
+/-- Convenience specialization of `candForsPreTable` to `vt = slVirtualTreeDet pr pk u`. -/
 noncomputable def candForsPre (pk : pr.PkSeed) (u : SlSecAdrs vp → pr.Y)
     (out : Option (List Byte × Stateless.Sig pr)) (st : SlSignSt pr) :
     Option (Adrs × pr.Y) :=
-  if EvForsPre pr pk u out st then
-    match out with
-    | none => none
-    | some (msg, sig) =>
-        match extractedWitness pr pk u (some (msg, sig)) st with
-        | some (.fors (.fPreimage i val)) =>
-            let parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk (slRootDet pr pk u) msg)
-            some (forsNodeAdrs parts.forsAdrs 0 (forsSigLeafIndex vp.sl.params parts.md.toList i.val), val)
-        | _ => none
-  else none
+  candForsPreTable pr pk u (slVirtualTreeDet pr pk u) out st
+
+omit [Fintype pr.Y] [SampleableType pr.Y] [SampleableType pr.PkSeed] in
+/-- Equivalence between single-pass `candForsPre` and the `EvForsPre`-guarded specification. -/
+theorem candForsPre_eq_spec (pk : pr.PkSeed) (u : SlSecAdrs vp → pr.Y)
+    (out : Option (List Byte × Stateless.Sig pr)) (st : SlSignSt pr) :
+    candForsPre pr pk u out st =
+      if EvForsPre pr pk u out st then
+        match out with
+        | none => none
+        | some (msg, sig) =>
+            match extractedWitness pr pk u (some (msg, sig)) st with
+            | some (.fors (.fPreimage i val)) =>
+                let parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk (slRootDet pr pk u) msg)
+                some (forsNodeAdrs parts.forsAdrs 0 (forsSigLeafIndex vp.sl.params parts.md.toList i.val), val)
+            | _ => none
+      else none := by
+  rcases out with _ | ⟨msg, sig⟩
+  · simp [candForsPre, candForsPreTable, EvForsPre, PostPrfWin]
+  · have hvt := slVirtualTreeDet_spec pr pk u
+    have hvt_pk : (slVirtualTreeDet pr pk u).1 = slRootDet pr pk u :=
+      hvt.1.trans (slRootDet_eq_honestVal pr pk u).symm
+    have hfst : (verifyAndExtractTable pr pk (slVirtualTreeDet pr pk u).1 (slVirtualTreeDet pr pk u).2 u
+        msg sig (chosenForsTree pr pk (slVirtualTreeDet pr pk u).1 st.itLog msg sig)).1 =
+        SLHDSA.GeneralScheme.verifyInternal vp.sl pr.toSLHDSA msg sig ⟨pk, slRootDet pr pk u⟩ := by
+      rw [hvt_pk]
+      exact verifyAndExtractTable_fst pr pk (slRootDet pr pk u) _ u hvt.2.2 msg sig _
+    have hsnd : (verifyAndExtractTable pr pk (slVirtualTreeDet pr pk u).1 (slVirtualTreeDet pr pk u).2 u
+        msg sig (chosenForsTree pr pk (slVirtualTreeDet pr pk u).1 st.itLog msg sig)).2 =
+        extractedWitness pr pk u (some (msg, sig)) st := rfl
+    unfold candForsPre candForsPreTable
+    dsimp only
+    rw [hfst, hsnd]
+    by_cases hev : EvForsPre pr pk u (some (msg, sig)) st
+    · obtain ⟨hwin, hnotItsr, i, val, hw⟩ := hev
+      have hnc : ¬ ITSR.Covered
+          (st.itLog.toFinset.image (Notions.itsrG (slHmsg pr) (slMap vp)))
+          (Notions.itsrG (slHmsg pr) (slMap vp) (sig.randomness, (pk, (slVirtualTreeDet pr pk u).1, msg))) := by
+        rw [hvt_pk]; intro hc; exact hnotItsr ⟨hwin, by convert hc⟩
+      rw [ite_eq_left hwin.1, ite_eq_left ⟨hwin.2, hnc⟩, ite_eq_left ⟨hwin, hnotItsr, i, val, hw⟩,
+        hw, hvt_pk]
+    · rw [ite_eq_right hev]
+      by_cases hm : msg ∉ st.log
+      · rw [ite_eq_left hm]
+        by_cases hcond : SLHDSA.GeneralScheme.verifyInternal vp.sl pr.toSLHDSA msg sig ⟨pk, slRootDet pr pk u⟩ = true ∧
+            ¬ ITSR.Covered (st.itLog.toFinset.image (Notions.itsrG (slHmsg pr) (slMap vp)))
+              (Notions.itsrG (slHmsg pr) (slMap vp) (sig.randomness, (pk, (slVirtualTreeDet pr pk u).1, msg)))
+        · rw [ite_eq_left hcond]
+          cases hw : extractedWitness pr pk u (some (msg, sig)) st with
+          | none => rfl
+          | some w =>
+            cases w with
+            | hypertree _ => rfl
+            | fors fw =>
+              cases fw with
+              | tlCollision _ => rfl
+              | hCollision _ _ _ => rfl
+              | fPreimage i val =>
+                exfalso; apply hev
+                refine ⟨⟨hm, hcond.1⟩, fun hitsr => hcond.2 (by rw [hvt_pk]; convert hitsr.2), i, val, hw⟩
+        · rw [ite_eq_right hcond]
+      · rw [ite_eq_right hm]
 
 /-- `B_tcrF_fors`: Stage-1 routed `SM-TCR` reduction against `F ∈ Th_λ` (`q₈ = qForsLeaf vp`). -/
 noncomputable def B_tcrF_fors {D E : Type} {qs : ℕ}
     (sfStage : SfStage1 pr D E) (adv : PostPrfAdv pr D E qs) :=
-  routedTcrAdv pr sfStage adv .F isForsLeaf (qForsLeaf vp) (idxExtract pr (candForsPre pr))
+  routedTcrAdv pr sfStage adv .F isForsLeaf (qForsLeaf vp) (idxExtract pr (candForsPreTable pr))
 
 /-- `B_dsprF_fors`: Stage-1 routed `SM-DSPR` reduction against `F ∈ Th_λ` (`q₈ = qForsLeaf vp`).
 When `EvForsPre` holds with witness `(aLeaf*, val)` AND `val = honestX` (the preimage at `aLeaf*`),
 it guesses `(idxOf aLeaf*, false)` (predicting NO second preimage); otherwise it outputs the
-out-of-range index `savedQ.length`, which loses both `SM_DT_DSPR_Experiment` and
-`SM_DT_DSPR_SPExperiment`. -/
+strictly in-range fallback `(0, true)` (`0 < qForsLeaf vp`), complying with Main Paper
+Definition 4.10 (`j ∈ [|Q|]`) while cancelling the shared `Pr[fallback ∧ SP(Q[0])]` term
+identically in `SM_DT_DSPR_Advantage`. -/
 noncomputable def B_dsprF_fors {D E : Type} {qs : ℕ}
     (sfStage : SfStage1 pr D E) (adv : PostPrfAdv pr D E qs) :
     SM_DT_DSPR_Adversary (Notions.smDsprMemberProblem (pr.member ($ᵗ pr.PkSeed) .F) pr.collection (qForsLeaf vp)) where
@@ -1825,15 +1799,35 @@ noncomputable def B_dsprF_fors {D E : Type} {qs : ℕ}
   guess st pk := do
     let (d, sf, u, vt, savedQ) := st
     let res ← runPostPrf pr adv d sf pk vt.1 (slSignTable pr vt.2 pk vt.1 u)
-    return match candForsPre pr pk u res.1 res.2 with
-      | none => (savedQ.length, false)
+    return match candForsPreTable pr pk u vt res.1 res.2 with
+      | none => (0, true)
       | some (aLeaf, val) =>
           let j := (savedQ.map Prod.fst).idxOf aLeaf
           match savedQ[j]? with
-          | some (_, x) => if val = x then (j, false) else (savedQ.length, false)
-          | none => (savedQ.length, false)
+          | some (_, x) => if val = x then (j, false) else (0, true)
+          | none => (0, true)
 
-omit [Fintype pr.Y] [SampleableType pr.Y] [DecidableEq pr.PkSeed] [SampleableType pr.PkSeed] in
+omit [Fintype pr.Y] [DecidableEq pr.Y] [SampleableType pr.Y] [DecidableEq pr.PkSeed]
+  [SampleableType pr.PkSeed] in
+/-- The FORS leaf target list `routedTargets pr pk u .F isForsLeaf` is always nonempty (`0 < q₈`),
+so the fallback index `0` in `B_dsprF_fors.guess` is strictly in-range (`0 < |Q|`). -/
+theorem routedTargets_forsLeaf_pos (pk : pr.PkSeed) (u : SlSecAdrs vp → pr.Y) :
+    0 < (routedTargets pr pk u .F isForsLeaf).length := by
+  let bpos : BottomPosition vp.sl :=
+    ⟨⟨0, Nat.pow_pos (by decide)⟩, ⟨0, Nat.pow_pos (by decide)⟩⟩
+  let a0 := forsNodeAdrs bpos.forsAdrs 0 0
+  have hmem_fl : a0 ∈ forsLeafAddresses vp.sl := by
+    have h := mem_forsLeafAddresses vp.sl bpos ⟨0, vp.valid.k_pos⟩ ⟨0, by simp [SLHDSA.Params.t]⟩
+    simpa [a0] using h
+  have hca : a0 ∈ constructionAddresses vp.sl :=
+    (mem_constructionAddresses_iff _).2 (Or.inl hmem_fl)
+  have ht : isForsLeaf a0 = true := rfl
+  have hhi : honestInput pr pk u a0 = some ⟨.F, slSecOf pr u (forsSkAdrs bpos.forsAdrs 0)⟩ :=
+    honestInput_forsLeaf pr pk u bpos.forsAdrs 0
+  have hmemQ := mem_routedTargets_of_honestInput pr pk u .F isForsLeaf hca ht hhi
+  exact List.length_pos_of_mem hmemQ
+
+omit [Fintype pr.Y] [SampleableType pr.Y] [SampleableType pr.PkSeed] in
 /-- Soundness of `candForsPre`: whenever `EvForsPre` holds, `candForsPre` returns `some (aLeaf, val)`
 with `aLeaf ∈ forsLeafAddresses`, `honestInput = some ⟨.F, x*⟩`, and `pr.F pk aLeaf val = pr.F pk aLeaf x*`. -/
 theorem candForsPre_sound (pk : pr.PkSeed) (u : SlSecAdrs vp → pr.Y)
@@ -1857,12 +1851,19 @@ theorem candForsPre_sound (pk : pr.PkSeed) (u : SlSecAdrs vp → pr.Y)
   · exact hwin.elim
   · have hval := extractedWitness_sound pr pk u msg sig st hw
     rw [Witness.valid_fors, ForsWitness.valid_fPreimage] at hval
+    have hvt := slVirtualTreeDet_spec pr pk u
+    have hvt_pk : (slVirtualTreeDet pr pk u).1 = slRootDet pr pk u :=
+      hvt.1.trans (slRootDet_eq_honestVal pr pk u).symm
+    set parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk (slRootDet pr pk u) msg)
     have hi_eq : i = chosenForsTree pr pk (slRootDet pr pk u) st.itLog msg sig := by
       have hw' := hw
       unfold extractedWitness at hw'
       dsimp only at hw'
-      split at hw'
-      · simp only [Option.some.injEq, Witness.fors.injEq] at hw'
+      rw [hvt_pk] at hw'
+      by_cases hfp : forsPkFromSig (prEager pr) (toEagerSig pr sig).fors parts.md.toList pk parts.forsAdrs =
+          forsPkGen (prEager pr) u pk parts.forsAdrs
+      · rw [verifyAndExtractTable_snd_of_forsPk_eq pr pk (slRootDet pr pk u) _ u hvt.2.2 msg sig _ hfp,
+          Option.some.injEq, Witness.fors.injEq] at hw'
         unfold slFindForsWitness at hw'
         split at hw'
         · rcases hfind : (List.finRange vp.sl.params.k).findSome?
@@ -1878,16 +1879,14 @@ theorem candForsPre_sound (pk : pr.PkSeed) (u : SlSecAdrs vp → pr.Y)
             · rw [Option.map_eq_some_iff] at hj
               obtain ⟨_, _, rfl⟩ := hj; cases hw'
         · cases hw'
-      · rename_i hfp
-        rw [findWitness_eq_hypertree_of_ne u ⟨pk, slRootDet pr pk u⟩ msg (toEagerSig pr sig) _ hfp,
-            Option.map_eq_some_iff] at hw'
+      · rw [verifyAndExtractTable_snd_of_forsPk_ne pr pk (slRootDet pr pk u) _ u hvt.2.2 msg sig _ hfp,
+          Option.map_eq_some_iff] at hw'
         obtain ⟨_, _, hcontra⟩ := hw'; cases hcontra
-    set parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk (slRootDet pr pk u) msg)
     have hp_eq : schemeParts vp.sl (prEager pr) msg (toEagerSig pr sig) ⟨pk, slRootDet pr pk u⟩ = parts :=
       schemeParts_eq vp.sl (prEager pr) msg (toEagerSig pr sig) ⟨pk, slRootDet pr pk u⟩
     rw [hp_eq] at hval
     refine ⟨msg, sig, i, val, rfl, hw,
-      by simp [candForsPre, EvForsPre, hwin, hnotItsr, hw],
+      by rw [candForsPre_eq_spec]; simp [EvForsPre, hwin, hnotItsr, hw],
       (mem_constructionAddresses_iff _).2 (Or.inl (mem_forsLeafAddresses_of_parts parts parts.md.toList i)),
       rfl, honestInput_forsLeaf pr pk u parts.forsAdrs _, hval, hi_eq⟩
 
@@ -1917,7 +1916,7 @@ def EvForsPreNoSP (pk : pr.PkSeed) (u : SlSecAdrs vp → pr.Y)
     honestInput pr pk u aLeaf = some ⟨.F, x⟩ ∧
     ¬ SecondPreimageExists (pr.member ($ᵗ pr.PkSeed) .F) pk aLeaf x
 
-omit [Fintype pr.Y] [DecidableEq pr.PkSeed] in
+omit [Fintype pr.Y] in
 /-- `EvForsPreNe` is bounded directly by `SM_DT_TCR_Advantage (B_tcrF_fors ...)`. -/
 theorem pr_EvForsPreNe_le {D E : Type} {qs : ℕ}
     (sfStage : SfStage1 pr D E) (adv : PostPrfAdv pr D E qs) :
@@ -1926,9 +1925,9 @@ theorem pr_EvForsPreNe_le {D E : Type} {qs : ℕ}
   refine routedTcr_bound_of_witness pr sfStage adv .F isForsLeaf (qForsLeaf vp)
     (fun _ _ ht u tbl => evalNodeInput_isForsLeaf pr ht u tbl)
     (by rw [countP_slTreeAddresses_isForsLeaf]; exact le_rfl)
-    (EvForsPreNe pr) (candForsPre pr) fun pk u out st ⟨aLeaf, val, x, hcand, hhi, hne⟩ => ?_
+    (EvForsPreNe pr) (candForsPreTable pr) fun pk u out st ⟨aLeaf, val, x, hcand, hhi, hne⟩ => ?_
   have hev : EvForsPre pr pk u out st := by
-    by_contra hnot; simp [candForsPre, hnot] at hcand
+    by_contra hnot; rw [candForsPre_eq_spec, ite_eq_right hnot] at hcand; cases hcand
   obtain ⟨msg, sig, i, val', _, _, hcand', hca, ht, hhi', hF, _⟩ := candForsPre_sound pr pk u out st hev
   rw [hcand] at hcand'; obtain ⟨ha_eq, hv_eq⟩ := Prod.mk.inj (Option.some.inj hcand')
   subst hv_eq
@@ -1944,104 +1943,113 @@ theorem pr_EvForsPreNe_le {D E : Type} {qs : ℕ}
   rw [← hx] at hF
   exact ⟨aLeaf, val, x, hcand, hca, ht, hhi, hne, hF⟩
 
-omit [DecidableEq pr.PkSeed] in
-/-- **Exact `SM-DSPR` advantage of `B_dsprF_fors`**:
-`Pr[EvForsPreNoSP] - Pr[EvForsPreEqSP] = SM_DT_DSPR_Advantage (B_dsprF_fors ...)`. -/
+omit [Fintype pr.Y] in
+/-- Shared Stage-1 + Stage-2 distribution evaluation for `B_dsprF_fors` (both `Experiment` and
+`SPExperiment`). -/
+private theorem dspr_B_dsprF_fors_both {D E : Type} {qs : ℕ}
+    (sfStage : SfStage1 pr D E) (adv : PostPrfAdv pr D E qs)
+    (check : pr.PkSeed → List (Adrs × pr.MemberMsg .F) → ℕ × Bool → Bool) :
+    let prob := Notions.smDsprMemberProblem (pr.member ($ᵗ pr.PkSeed) .F) pr.collection (qForsLeaf vp)
+    (do
+      let pk ← prob.th.seedGen
+      let r ← (simulateQ (SM_DT_DSPR_oracles prob pk)
+        (B_dsprF_fors pr sfStage adv).choose).run ([], [])
+      let jb ← (B_dsprF_fors pr sfStage adv).guess r.1 pk
+      return check pk r.2.1 jb) =ᵈ
+    (do
+      let pk ← $ᵗ pr.PkSeed
+      let d ← sfStage.g₁
+      let u ← $ᵗ (SlSecAdrs vp → pr.Y)
+      let pkSl := slRootDet pr pk u
+      let res ← runPostPrf pr adv d (sfStage.sfDet d pk) pk pkSl (slSignDet pr pk pkSl u)
+      let Q := routedTargets pr pk u .F isForsLeaf
+      let jb : ℕ × Bool :=
+        match candForsPre pr pk u res.1 res.2 with
+        | none => (0, true)
+        | some (aLeaf, val) =>
+            let j := (Q.map Prod.fst).idxOf aLeaf
+            match Q[j]? with
+            | some (_, x) => if val = x then (j, false) else (0, true)
+            | none => (0, true)
+      return check pk Q jb) := by
+  set prob := Notions.smDsprMemberProblem (pr.member ($ᵗ pr.PkSeed) .F) pr.collection (qForsLeaf vp)
+  refine EvalDistEq.bind_right _ fun pk => ?_
+  simp only [B_dsprF_fors]
+  rw [show SM_DT_DSPR_oracles prob pk =
+      Fxmss.unifFwd _ + (SM_DT_DSPR_challengeOracle prob pk +
+        collectionOracle Prod.fst prob.thColl pk) from rfl]
+  rw [Fxmss.simulateQ_add_liftM_bind_run, bind_assoc]
+  refine EvalDistEq.bind_congr_of_support _ fun d hd => ?_
+  rw [← show SM_DT_DSPR_oracles prob pk =
+      Fxmss.unifFwd _ + (SM_DT_DSPR_challengeOracle prob pk +
+        collectionOracle Prod.fst prob.thColl pk) from rfl]
+  obtain ⟨⟨qs₀, tws₀⟩, ⟨hqs₀, htws₀⟩, hsf⟩ := sfStage.sfRun_spec
+    (SM_DT_DSPR_oracles prob pk) (sfDsprCall pr) pk
+    (fun s => s.1 = [] ∧ ∀ t ∈ s.2, Scheme.IsStateful t)
+    (fun s a => (s.1, s.2 ++ [a]))
+    (fun i a msg s hsf ⟨hqs, _⟩ => by
+      rcases s with ⟨qs, tws⟩; dsimp only at hqs; subst hqs
+      unfold sfDsprCall
+      simp only [simulateQ_bind, simulateQ_spec_query, SM_DT_DSPR_oracles,
+        QueryImpl.add_apply_inr, StateT.run_bind, simulateQ_pure, StateT.run_pure,
+        collectionOracle, StateT.run_get, pure_bind, TweakReserved, List.not_mem_nil,
+        false_and, exists_false, ↓reduceIte, StateT.run_set, Option.getD_some]
+      rfl)
+    (fun s a ⟨hqs, htws⟩ hsf => ⟨hqs, fun t ht => by
+      rcases List.mem_append.1 ht with ht1 | ht2
+      · exact htws t ht1
+      · simp only [List.mem_singleton] at ht2; subst ht2; exact hsf⟩)
+    d hd ([], []) ⟨rfl, fun _ h => by simp at h⟩
+  dsimp only at hqs₀; subst hqs₀
+  have hsf' : (simulateQ (SM_DT_DSPR_oracles prob pk)
+      (sfStage.sfRun (sfDsprCall pr) d)).run ([], []) = pure (sfStage.sfDet d pk, ([], tws₀)) := hsf
+  simp only [simulateQ_bind, StateT.run_bind, hsf', pure_bind, bind_assoc]
+  rw [show SM_DT_DSPR_oracles prob pk =
+      Fxmss.unifFwd _ + (SM_DT_DSPR_challengeOracle prob pk +
+        collectionOracle Prod.fst prob.thColl pk) from rfl]
+  rw [Fxmss.simulateQ_add_liftM_run, bind_map_left]
+  refine EvalDistEq.bind_right _ fun u => ?_
+  rw [← show SM_DT_DSPR_oracles prob pk =
+      Fxmss.unifFwd _ + (SM_DT_DSPR_challengeOracle prob pk +
+        collectionOracle Prod.fst prob.thColl pk) from rfl]
+  obtain ⟨tws', _, hvt⟩ := simulateQ_slVirtualTreeM_routed_dspr pr .F isForsLeaf (qForsLeaf vp)
+    (fun _ _ ht u tbl => evalNodeInput_isForsLeaf pr ht u tbl)
+    (by rw [countP_slTreeAddresses_isForsLeaf]; exact le_rfl) pk u tws₀ htws₀
+  have hrec := simulateQ_recordDspr_run prob pk (slVirtualTreeM pr (routedDsprCall pr) u) [] tws₀
+  unfold routedDsprCall at hrec
+  rw [hvt, map_pure] at hrec
+  change ((simulateQ (SM_DT_DSPR_oracles prob pk)
+    ((simulateQ (recordDsprImpl prob)
+      (slVirtualTreeM pr (routedDsprCall pr) u)).run [])).run ([], tws₀) >>= _) =ᵈ _
+  have hrec' : (simulateQ (SM_DT_DSPR_oracles prob pk)
+    ((simulateQ (recordDsprImpl prob)
+      (slVirtualTreeM pr (routedDsprCall pr) u)).run [])).run ([], tws₀) =
+    pure ((slVirtualTreeDet pr pk u, routedTargets pr pk u .F isForsLeaf),
+      (routedTargets pr pk u .F isForsLeaf, tws')) := hrec
+  rw [hrec']
+  simp only [pure_bind, simulateQ_pure, StateT.run_pure]
+  have hvt_spec := slVirtualTreeDet_spec pr pk u
+  have hpkSl : (slVirtualTreeDet pr pk u).1 = slRootDet pr pk u :=
+    hvt_spec.1.trans (slRootDet_eq_honestVal pr pk u).symm
+  have hsign_eq : slSignTable pr (slVirtualTreeDet pr pk u).2 pk (slVirtualTreeDet pr pk u).1 u =
+      slSignDet pr pk (slRootDet pr pk u) u := by
+    funext msg R; rw [hpkSl]
+    exact slSignTable_eq_slSignDet pr pk (slRootDet pr pk u) u hvt_spec.2.2 msg R
+  rw [hsign_eq, hpkSl]
+  rfl
+
+/-- **Exact `SM-DSPR` advantage of `B_dsprF_fors`** (with strictly in-range fallback `(0, true)`):
+both `SM_DT_DSPR_Success` and `SM_DT_DSPR_SPProbability` shift by the exact same finite probability
+`c = Pr[fallback ∧ SP(Q[0])] ≤ 1 < ⊤`, which cancels identically in `SM_DT_DSPR_Advantage`! -/
 theorem dspr_B_dsprF_fors_eq {D E : Type} {qs : ℕ}
     (sfStage : SfStage1 pr D E) (adv : PostPrfAdv pr D E qs) :
-    SM_DT_DSPR_Success (B_dsprF_fors pr sfStage adv) =
-      Pr{let z ← postPrfExp pr sfStage adv}[EvForsPreNoSP pr z.1 z.2.1 z.2.2.1 z.2.2.2] ∧
-    SM_DT_DSPR_SPProbability (B_dsprF_fors pr sfStage adv) =
-      Pr{let z ← postPrfExp pr sfStage adv}[EvForsPreEqSP pr z.1 z.2.1 z.2.2.1 z.2.2.2] := by
+    ∃ c : ℝ≥0∞, c ≠ ⊤ ∧
+      SM_DT_DSPR_Success (B_dsprF_fors pr sfStage adv) =
+        Pr{let z ← postPrfExp pr sfStage adv}[EvForsPreNoSP pr z.1 z.2.1 z.2.2.1 z.2.2.2] + c ∧
+      SM_DT_DSPR_SPProbability (B_dsprF_fors pr sfStage adv) =
+        Pr{let z ← postPrfExp pr sfStage adv}[EvForsPreEqSP pr z.1 z.2.1 z.2.2.1 z.2.2.2] + c := by
   set prob := Notions.smDsprMemberProblem (pr.member ($ᵗ pr.PkSeed) .F) pr.collection (qForsLeaf vp)
-  -- Shared Stage-1 + Stage-2 distribution evaluation for both `Experiment` and `SPExperiment`!
-  have hboth : ∀ (check : pr.PkSeed → List (Adrs × pr.MemberMsg .F) → ℕ × Bool → Bool),
-      (do
-        let pk ← prob.th.seedGen
-        let r ← (simulateQ (SM_DT_DSPR_oracles prob pk)
-          (B_dsprF_fors pr sfStage adv).choose).run ([], [])
-        let jb ← (B_dsprF_fors pr sfStage adv).guess r.1 pk
-        return check pk r.2.1 jb) =ᵈ
-      (do
-        let pk ← $ᵗ pr.PkSeed
-        let d ← sfStage.g₁
-        let u ← $ᵗ (SlSecAdrs vp → pr.Y)
-        let pkSl := slRootDet pr pk u
-        let res ← runPostPrf pr adv d (sfStage.sfDet d pk) pk pkSl (slSignDet pr pk pkSl u)
-        let Q := routedTargets pr pk u .F isForsLeaf
-        let jb : ℕ × Bool :=
-          match candForsPre pr pk u res.1 res.2 with
-          | none => (Q.length, false)
-          | some (aLeaf, val) =>
-              let j := (Q.map Prod.fst).idxOf aLeaf
-              match Q[j]? with
-              | some (_, x) => if val = x then (j, false) else (Q.length, false)
-              | none => (Q.length, false)
-        return check pk Q jb) := by
-    intro check
-    refine EvalDistEq.bind_right _ fun pk => ?_
-    simp only [B_dsprF_fors]
-    rw [show SM_DT_DSPR_oracles prob pk =
-        Fxmss.unifFwd _ + (SM_DT_DSPR_challengeOracle prob pk +
-          collectionOracle Prod.fst prob.thColl pk) from rfl]
-    rw [Fxmss.simulateQ_add_liftM_bind_run, bind_assoc]
-    refine EvalDistEq.bind_congr_of_support _ fun d hd => ?_
-    rw [← show SM_DT_DSPR_oracles prob pk =
-        Fxmss.unifFwd _ + (SM_DT_DSPR_challengeOracle prob pk +
-          collectionOracle Prod.fst prob.thColl pk) from rfl]
-    obtain ⟨⟨qs₀, tws₀⟩, ⟨hqs₀, htws₀⟩, hsf⟩ := sfStage.sfRun_spec
-      (SM_DT_DSPR_oracles prob pk) (sfDsprCall pr) pk
-      (fun s => s.1 = [] ∧ ∀ t ∈ s.2, Scheme.IsStateful t)
-      (fun s a => (s.1, s.2 ++ [a]))
-      (fun i a msg s hsf ⟨hqs, _⟩ => by
-        rcases s with ⟨qs, tws⟩; dsimp only at hqs; subst hqs
-        unfold sfDsprCall
-        simp only [simulateQ_bind, simulateQ_spec_query, SM_DT_DSPR_oracles,
-          QueryImpl.add_apply_inr, StateT.run_bind, simulateQ_pure, StateT.run_pure,
-          collectionOracle, StateT.run_get, pure_bind, TweakReserved, List.not_mem_nil,
-          false_and, exists_false, ↓reduceIte, StateT.run_set, Option.getD_some]
-        rfl)
-      (fun s a ⟨hqs, htws⟩ hsf => ⟨hqs, fun t ht => by
-        rcases List.mem_append.1 ht with ht1 | ht2
-        · exact htws t ht1
-        · simp only [List.mem_singleton] at ht2; subst ht2; exact hsf⟩)
-      d hd ([], []) ⟨rfl, fun _ h => by simp at h⟩
-    dsimp only at hqs₀; subst hqs₀
-    have hsf' : (simulateQ (SM_DT_DSPR_oracles prob pk)
-        (sfStage.sfRun (sfDsprCall pr) d)).run ([], []) = pure (sfStage.sfDet d pk, ([], tws₀)) := hsf
-    simp only [simulateQ_bind, StateT.run_bind, hsf', pure_bind, bind_assoc]
-    rw [show SM_DT_DSPR_oracles prob pk =
-        Fxmss.unifFwd _ + (SM_DT_DSPR_challengeOracle prob pk +
-          collectionOracle Prod.fst prob.thColl pk) from rfl]
-    rw [Fxmss.simulateQ_add_liftM_run, bind_map_left]
-    refine EvalDistEq.bind_right _ fun u => ?_
-    rw [← show SM_DT_DSPR_oracles prob pk =
-        Fxmss.unifFwd _ + (SM_DT_DSPR_challengeOracle prob pk +
-          collectionOracle Prod.fst prob.thColl pk) from rfl]
-    obtain ⟨tws', _, hvt⟩ := simulateQ_slVirtualTreeM_routed_dspr pr .F isForsLeaf (qForsLeaf vp)
-      (fun _ _ ht u tbl => evalNodeInput_isForsLeaf pr ht u tbl)
-      (by rw [countP_slTreeAddresses_isForsLeaf]; exact le_rfl) pk u tws₀ htws₀
-    have hrec := simulateQ_recordDspr_run prob pk (slVirtualTreeM pr (routedDsprCall pr) u) [] tws₀
-    unfold routedDsprCall at hrec
-    rw [hvt, map_pure] at hrec
-    change ((simulateQ (SM_DT_DSPR_oracles prob pk)
-      ((simulateQ (recordDsprImpl prob)
-        (slVirtualTreeM pr (routedDsprCall pr) u)).run [])).run ([], tws₀) >>= _) =ᵈ _
-    have hrec' : (simulateQ (SM_DT_DSPR_oracles prob pk)
-      ((simulateQ (recordDsprImpl prob)
-        (slVirtualTreeM pr (routedDsprCall pr) u)).run [])).run ([], tws₀) =
-      pure ((slVirtualTreeDet pr pk u, routedTargets pr pk u .F isForsLeaf),
-        (routedTargets pr pk u .F isForsLeaf, tws')) := hrec
-    rw [hrec']
-    simp only [pure_bind, simulateQ_pure, StateT.run_pure]
-    have hvt_spec := slVirtualTreeDet_spec pr pk u
-    have hpkSl : (slVirtualTreeDet pr pk u).1 = slRootDet pr pk u :=
-      hvt_spec.1.trans (slRootDet_eq_honestVal pr pk u).symm
-    have hsign_eq : slSignTable pr (slVirtualTreeDet pr pk u).2 pk (slVirtualTreeDet pr pk u).1 u =
-        slSignDet pr pk (slRootDet pr pk u) u := by
-      funext msg R; rw [hpkSl]
-      exact slSignTable_eq_slSignDet pr pk (slRootDet pr pk u) u hvt_spec.2.2 msg R
-    rw [hsign_eq, hpkSl]
+  have hboth := dspr_B_dsprF_fors_both pr sfStage adv
   -- Helper: lookup `Q[(Q.map Prod.fst).idxOf aLeaf]? = some (aLeaf, x)` whenever `candForsPre` succeeds
   have hQ_lookup : ∀ pk u out st aLeaf val,
       candForsPre pr pk u out st = some (aLeaf, val) →
@@ -2051,7 +2059,7 @@ theorem dspr_B_dsprF_fors_eq {D E : Type} {qs : ℕ}
           some (aLeaf, x) := by
     intro pk u out st aLeaf val hcand
     have hev : EvForsPre pr pk u out st := by
-      by_contra hnot; simp [candForsPre, hnot] at hcand
+      by_contra hnot; rw [candForsPre_eq_spec, ite_eq_right hnot] at hcand; cases hcand
     obtain ⟨_, _, _, _, _, _, hcand', hca, ht, hhi, hF, _⟩ := candForsPre_sound pr pk u out st hev
     rw [hcand] at hcand'; obtain ⟨ha_eq, hval_eq⟩ := Prod.mk.inj (Option.some.inj hcand')
     subst hval_eq
@@ -2075,8 +2083,49 @@ theorem dspr_B_dsprF_fors_eq {D E : Type} {qs : ℕ}
     rw [List.getElem?_eq_getElem hidx_lt]
     subst hkeq_idx
     exact congrArg some hkeq
-  constructor
-  · -- Part 1: `SM_DT_DSPR_Success = Pr[EvForsPreNoSP]`
+  -- Shared fallback event: `(0, true)` is returned AND `Q[0]` has a second preimage!
+  let EvFallbackSP (pk : pr.PkSeed) (u : SlSecAdrs vp → pr.Y)
+      (out : Option (List Byte × Stateless.Sig pr)) (st : SlSignSt pr) : Prop :=
+    (¬ ∃ aLeaf val x, candForsPre pr pk u out st = some (aLeaf, val) ∧
+        honestInput pr pk u aLeaf = some ⟨.F, x⟩ ∧ val = x) ∧
+    match (routedTargets pr pk u .F isForsLeaf)[0]? with
+    | none => False
+    | some (t0, m0) => SecondPreimageExists prob.th pk t0 m0
+  -- Disjointness of `EvFallbackSP` from both `EvForsPreNoSP` and `EvForsPreEqSP`
+  have hdisjNo : ∀ z : pr.PkSeed × (SlSecAdrs vp → pr.Y) ×
+      Option (List Byte × Stateless.Sig pr) × SlSignSt pr,
+      ¬ (EvForsPreNoSP pr z.1 z.2.1 z.2.2.1 z.2.2.2 ∧ EvFallbackSP z.1 z.2.1 z.2.2.1 z.2.2.2) := by
+    rintro ⟨pk, u, out, st⟩ ⟨⟨aLeaf, val, x, hcand, hhi, hnoSP⟩, hfb, _⟩
+    obtain ⟨x', hhi', hF', _⟩ := hQ_lookup pk u out st aLeaf val hcand
+    rw [hhi] at hhi'; have hx : x = x' := by cases Option.some.inj hhi'; rfl
+    subst hx
+    by_cases hveq : val = x
+    · exact hfb ⟨aLeaf, val, x, hcand, hhi, hveq⟩
+    · exact hnoSP ⟨val, Ne.symm hveq, hF'.symm⟩
+  have hdisjEq : ∀ z : pr.PkSeed × (SlSecAdrs vp → pr.Y) ×
+      Option (List Byte × Stateless.Sig pr) × SlSignSt pr,
+      ¬ (EvForsPreEqSP pr z.1 z.2.1 z.2.2.1 z.2.2.2 ∧ EvFallbackSP z.1 z.2.1 z.2.2.1 z.2.2.2) := by
+    rintro ⟨pk, u, out, st⟩ ⟨⟨aLeaf, val, x, hcand, hhi, hveq, _⟩, hfb, _⟩
+    exact hfb ⟨aLeaf, val, x, hcand, hhi, hveq⟩
+  have hpr_or : ∀ (P Q : pr.PkSeed × (SlSecAdrs vp → pr.Y) ×
+        Option (List Byte × Stateless.Sig pr) × SlSignSt pr → Prop),
+      (∀ z, ¬ (P z ∧ Q z)) →
+      Pr{let z ← postPrfExp pr sfStage adv}[P z ∨ Q z] =
+        Pr{let z ← postPrfExp pr sfStage adv}[P z] +
+        Pr{let z ← postPrfExp pr sfStage adv}[Q z] := by
+    intro P Q hdisj
+    have h2 := prEvent_biUnion_finset (postPrfExp pr sfStage adv) ({true, false} : Finset Bool)
+      (fun b z => if b then P z else Q z) (fun b1 _ b2 _ hne z ⟨h1, h2⟩ => by
+        cases b1 <;> cases b2 <;> simp at hne h1 h2
+        · exact hdisj z ⟨h2, h1⟩
+        · exact hdisj z ⟨h1, h2⟩)
+    simp only [Finset.sum_pair (by decide : true ≠ false), ↓reduceIte, Bool.false_eq_true] at h2
+    rw [← h2]
+    congr 1; congr 1; funext z; simp [or_comm]
+  refine ⟨Pr{let z ← postPrfExp pr sfStage adv}[EvFallbackSP z.1 z.2.1 z.2.2.1 z.2.2.2],
+    ne_top_of_le_ne_top ENNReal.one_ne_top (prEvent_le_one _), ?_, ?_⟩
+  · -- Part 1: `SM_DT_DSPR_Success = Pr[EvForsPreNoSP] + Pr[EvFallbackSP]`
+    rw [← hpr_or _ _ hdisjNo]
     unfold SM_DT_DSPR_Success SM_DT_DSPR_Experiment postPrfExp
     rw [prEvent_eq_evalDist_bind]
     let check1 : pr.PkSeed → List (Adrs × pr.MemberMsg .F) → ℕ × Bool → Bool := fun pk Q jb =>
@@ -2110,36 +2159,50 @@ theorem dspr_B_dsprF_fors_eq {D E : Type} {qs : ℕ}
     refine congrArg (fun m => 𝒟[m] {true}) ?_
     refine bind_congr fun pk => bind_congr fun d => bind_congr fun u => bind_congr fun res => ?_
     congr 1
+    have hQpos : 0 < (routedTargets pr pk u .F isForsLeaf).length :=
+      routedTargets_forsLeaf_pos pr pk u
+    generalize hQ : routedTargets pr pk u .F isForsLeaf = Q at hQpos ⊢
+    have hQ0' : ∃ t0 m0, Q[0]? = some (t0, m0) :=
+      ⟨(Q[0]'hQpos).1, (Q[0]'hQpos).2, List.getElem?_eq_getElem hQpos⟩
+    obtain ⟨t0, m0, hQ0⟩ := hQ0'
     cases hcand : candForsPre pr pk u res.1 res.2 with
     | none =>
-      simp only [List.getElem?_eq_none le_rfl]
-      symm; rw [decide_eq_false_iff_not]
-      rintro ⟨_, _, _, hc, _⟩; rw [hcand] at hc; cases hc
+      dsimp only; rw [hQ0]
+      refine decide_eq_decide.2 ⟨fun h => Or.inr ⟨?_, ?_⟩, fun h => ?_⟩
+      · rintro ⟨_, _, _, hc, _⟩; rw [hcand] at hc; cases hc
+      · change match (routedTargets pr pk u .F isForsLeaf)[0]? with | _ => _; rw [hQ, hQ0]; exact h.2 rfl
+      · rcases h with ⟨_, _, _, hc, _⟩ | ⟨_, hsp0⟩
+        · rw [hcand] at hc; cases hc
+        · rw [hQ, hQ0] at hsp0; exact ⟨fun _ => rfl, fun _ => hsp0⟩
     | some av =>
       rcases av with ⟨aLeaf, val⟩
       obtain ⟨x, hhi, hF, hget⟩ := hQ_lookup pk u res.1 res.2 aLeaf val hcand
+      rw [hQ] at hget
       simp only [hget]
       by_cases hveq : val = x
       · subst hveq
         simp only [↓reduceIte, hget]
-        by_cases hsp : SecondPreimageExists prob.th pk aLeaf val
-        · rw [decide_eq_false (by simp [hsp])]
-          symm; rw [decide_eq_false_iff_not]
-          rintro ⟨a', v', x', hc, hhi', hsp'⟩
-          rw [hcand] at hc; obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj hc)
+        refine decide_eq_decide.2 ⟨fun h => Or.inl ⟨aLeaf, val, val, hcand, hhi, fun hsp => by
+          have := h.1 hsp; cases this⟩, fun h => ?_⟩
+        rcases h with ⟨a', v', x', hc, hhi', hno⟩ | ⟨hfb, _⟩
+        · rw [hcand] at hc; obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj hc)
           rw [hhi] at hhi'; have hx : val = x' := by cases Option.some.inj hhi'; rfl
-          subst hx; exact hsp' hsp
-        · rw [decide_eq_true (by simp [hsp])]
-          symm; rw [decide_eq_true_eq]
-          exact ⟨aLeaf, val, val, hcand, hhi, hsp⟩
-      · simp only [hveq, ↓reduceIte, List.getElem?_eq_none le_rfl]
-        symm; rw [decide_eq_false_iff_not]
-        rintro ⟨a', v', x', hc, hhi', hsp'⟩
-        rw [hcand] at hc; obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj hc)
-        rw [hhi] at hhi'; have hx : x = x' := by cases Option.some.inj hhi'; rfl
-        subst hx
-        exact hsp' ⟨val, Ne.symm hveq, hF.symm⟩
-  · -- Part 2: `SM_DT_DSPR_SPProbability = Pr[EvForsPreEqSP]`
+          subst hx; exact ⟨fun hsp => absurd hsp hno, fun h => by cases h⟩
+        · exact absurd ⟨aLeaf, val, val, hcand, hhi, rfl⟩ hfb
+      · simp only [hveq, ↓reduceIte, hQ0]
+        refine decide_eq_decide.2 ⟨fun h => Or.inr ⟨?_, ?_⟩, fun h => ?_⟩
+        · rintro ⟨a', v', x', hc, hhi', hveq'⟩
+          rw [hcand] at hc; obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj hc)
+          rw [hhi] at hhi'; have hx : x = x' := by cases Option.some.inj hhi'; rfl
+          subst hx; exact hveq hveq'
+        · change match (routedTargets pr pk u .F isForsLeaf)[0]? with | _ => _; rw [hQ, hQ0]; exact h.2 trivial
+        · rcases h with ⟨a', v', x', hc, hhi', hno⟩ | ⟨_, hsp0⟩
+          · rw [hcand] at hc; obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj hc)
+            rw [hhi] at hhi'; have hx : x = x' := by cases Option.some.inj hhi'; rfl
+            subst hx; exact absurd ⟨val, Ne.symm hveq, hF.symm⟩ hno
+          · rw [hQ, hQ0] at hsp0; exact ⟨fun _ => trivial, fun _ => hsp0⟩
+  · -- Part 2: `SM_DT_DSPR_SPProbability = Pr[EvForsPreEqSP] + Pr[EvFallbackSP]`
+    rw [← hpr_or _ _ hdisjEq]
     unfold SM_DT_DSPR_SPProbability SM_DT_DSPR_SPExperiment postPrfExp
     rw [prEvent_eq_evalDist_bind]
     let check2 : pr.PkSeed → List (Adrs × pr.MemberMsg .F) → ℕ × Bool → Bool := fun pk Q jb =>
@@ -2171,34 +2234,47 @@ theorem dspr_B_dsprF_fors_eq {D E : Type} {qs : ℕ}
     refine congrArg (fun m => 𝒟[m] {true}) ?_
     refine bind_congr fun pk => bind_congr fun d => bind_congr fun u => bind_congr fun res => ?_
     congr 1
+    have hQpos : 0 < (routedTargets pr pk u .F isForsLeaf).length :=
+      routedTargets_forsLeaf_pos pr pk u
+    generalize hQ : routedTargets pr pk u .F isForsLeaf = Q at hQpos ⊢
+    have hQ0' : ∃ t0 m0, Q[0]? = some (t0, m0) :=
+      ⟨(Q[0]'hQpos).1, (Q[0]'hQpos).2, List.getElem?_eq_getElem hQpos⟩
+    obtain ⟨t0, m0, hQ0⟩ := hQ0'
     cases hcand : candForsPre pr pk u res.1 res.2 with
     | none =>
-      simp only [List.getElem?_eq_none le_rfl]
-      symm; rw [decide_eq_false_iff_not]
-      rintro ⟨_, _, _, hc, _⟩; rw [hcand] at hc; cases hc
+      dsimp only; rw [hQ0]
+      refine decide_eq_decide.2 ⟨fun h => Or.inr ⟨?_, ?_⟩, fun h => ?_⟩
+      · rintro ⟨_, _, _, hc, _⟩; rw [hcand] at hc; cases hc
+      · change match (routedTargets pr pk u .F isForsLeaf)[0]? with | _ => _; rw [hQ, hQ0]; exact h
+      · rcases h with ⟨_, _, _, hc, _⟩ | ⟨_, hsp0⟩
+        · rw [hcand] at hc; cases hc
+        · rw [hQ, hQ0] at hsp0; exact hsp0
     | some av =>
       rcases av with ⟨aLeaf, val⟩
       obtain ⟨x, hhi, hF, hget⟩ := hQ_lookup pk u res.1 res.2 aLeaf val hcand
+      rw [hQ] at hget
       simp only [hget]
       by_cases hveq : val = x
       · subst hveq
         simp only [↓reduceIte, hget]
-        by_cases hsp : SecondPreimageExists prob.th pk aLeaf val
-        · rw [decide_eq_true hsp]
-          symm; rw [decide_eq_true_eq]
-          exact ⟨aLeaf, val, val, hcand, hhi, rfl, hsp⟩
-        · rw [decide_eq_false hsp]
-          symm; rw [decide_eq_false_iff_not]
-          rintro ⟨a', v', x', hc, hhi', _, hsp'⟩
-          rw [hcand] at hc; obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj hc)
+        refine decide_eq_decide.2 ⟨fun h => Or.inl ⟨aLeaf, val, val, hcand, hhi, rfl, h⟩, fun h => ?_⟩
+        rcases h with ⟨a', v', x', hc, hhi', _, hsp⟩ | ⟨hfb, _⟩
+        · rw [hcand] at hc; obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj hc)
           rw [hhi] at hhi'; have hx : val = x' := by cases Option.some.inj hhi'; rfl
-          subst hx; exact hsp hsp'
-      · simp only [hveq, ↓reduceIte, List.getElem?_eq_none le_rfl]
-        symm; rw [decide_eq_false_iff_not]
-        rintro ⟨a', v', x', hc, hhi', hveq', _⟩
-        rw [hcand] at hc; obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj hc)
-        rw [hhi] at hhi'; have hx : x = x' := by cases Option.some.inj hhi'; rfl
-        subst hx; exact hveq hveq'
+          subst hx; exact hsp
+        · exact absurd ⟨aLeaf, val, val, hcand, hhi, rfl⟩ hfb
+      · simp only [hveq, ↓reduceIte, hQ0]
+        refine decide_eq_decide.2 ⟨fun h => Or.inr ⟨?_, ?_⟩, fun h => ?_⟩
+        · rintro ⟨a', v', x', hc, hhi', hveq'⟩
+          rw [hcand] at hc; obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj hc)
+          rw [hhi] at hhi'; have hx : x = x' := by cases Option.some.inj hhi'; rfl
+          subst hx; exact hveq hveq'
+        · change match (routedTargets pr pk u .F isForsLeaf)[0]? with | _ => _; rw [hQ, hQ0]; exact h
+        · rcases h with ⟨a', v', x', hc, hhi', hveq', _⟩ | ⟨_, hsp0⟩
+          · rw [hcand] at hc; obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj hc)
+            rw [hhi] at hhi'; have hx : x = x' := by cases Option.some.inj hhi'; rfl
+            subst hx; exact absurd hveq' hveq
+          · rw [hQ, hQ0] at hsp0; exact hsp0
 
 /-! ### Fiber-symmetry proof (`Pr[EvForsPreEqSP] ≤ Pr[EvForsPreNe]`) -/
 
@@ -2706,7 +2782,7 @@ theorem forsCoordLeafAdrs_injective : Function.Injective (forsCoordLeafAdrs (vp 
     exact hmod)
   subst hl; rfl
 
-omit [Fintype pr.Y] [SampleableType pr.Y] [DecidableEq pr.PkSeed] [SampleableType pr.PkSeed] in
+omit [Fintype pr.Y] [SampleableType pr.Y] [SampleableType pr.PkSeed] in
 /-- `candForsPre` depends on `u` at `forsCoordSkAdrs c` ONLY through `pr.F pk (forsCoordLeafAdrs c) (u aSk)`! -/
 theorem candForsPre_eq_of_same_fiber (pk : pr.PkSeed) (c : ForsLeafCoord vp)
     (u₁ u₂ : SlSecAdrs vp → pr.Y)
@@ -2735,51 +2811,57 @@ theorem candForsPre_eq_of_same_fiber (pk : pr.PkSeed) (c : ForsLeafCoord vp)
     rw [hfors_roots b, hleaf]
   -- Now compare `candForsPre`!
   rcases out with _ | ⟨msg, sig⟩
-  · simp [candForsPre, EvForsPre, PostPrfWin]
-  · have hev_iff : EvForsPre pr pk u₁ (some (msg, sig)) st ↔ EvForsPre pr pk u₂ (some (msg, sig)) st := by
+  · simp [candForsPre, candForsPreTable]
+  · have hvt1 := slVirtualTreeDet_spec pr pk u₁
+    have hvt2 := slVirtualTreeDet_spec pr pk u₂
+    have hvt1_pk : (slVirtualTreeDet pr pk u₁).1 = slRootDet pr pk u₁ :=
+      hvt1.1.trans (slRootDet_eq_honestVal pr pk u₁).symm
+    have hvt2_pk : (slVirtualTreeDet pr pk u₂).1 = slRootDet pr pk u₂ :=
+      hvt2.1.trans (slRootDet_eq_honestVal pr pk u₂).symm
+    have hev_iff : EvForsPre pr pk u₁ (some (msg, sig)) st ↔ EvForsPre pr pk u₂ (some (msg, sig)) st := by
       have hff_iff : ∀ i val,
           extractedWitness pr pk u₁ (some (msg, sig)) st = some (.fors (.fPreimage i val)) ↔
           extractedWitness pr pk u₂ (some (msg, sig)) st = some (.fors (.fPreimage i val)) := by
         intro i val
         unfold extractedWitness; dsimp only
-        rw [← hpk]
+        rw [hvt1_pk, hvt2_pk, ← hpk]
         set pkSl := slRootDet pr pk u₁
-        set target := chosenForsTree pr pk pkSl st.itLog msg sig
-        set parts := schemeParts vp.sl (prEager pr) msg (toEagerSig pr sig) ⟨pk, pkSl⟩
+        set parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk pkSl msg)
         by_cases hfp : forsPkFromSig (prEager pr) (toEagerSig pr sig).fors parts.md.toList pk parts.forsAdrs =
             forsPkGen (prEager pr) u₁ pk parts.forsAdrs
         · have hfp2 : forsPkFromSig (prEager pr) (toEagerSig pr sig).fors parts.md.toList pk parts.forsAdrs =
               forsPkGen (prEager pr) u₂ pk parts.forsAdrs := hfp.trans (hfors_pk _)
-          dsimp only [pkSl, parts, target] at hfp hfp2 ⊢
-          rw [ite_eq_left hfp, ite_eq_left hfp2, hfind_fors]
+          rw [verifyAndExtractTable_snd_of_forsPk_eq pr pk pkSl _ u₁ hvt1.2.2 msg sig _ hfp,
+              verifyAndExtractTable_snd_of_forsPk_eq pr pk pkSl _ u₂ hvt2.2.2 msg sig _ hfp2]
+          dsimp only
+          rw [hfind_fors]
         · have hfp2 : forsPkFromSig (prEager pr) (toEagerSig pr sig).fors parts.md.toList pk parts.forsAdrs ≠
               forsPkGen (prEager pr) u₂ pk parts.forsAdrs := fun h => hfp (h.trans (hfors_pk _).symm)
-          dsimp only [pkSl, parts, target] at hfp hfp2 ⊢
-          rw [ite_eq_right hfp, ite_eq_right hfp2,
-              findWitness_eq_hypertree_of_ne u₁ ⟨pk, slRootDet pr pk u₁⟩ msg (toEagerSig pr sig) _ hfp,
-              findWitness_eq_hypertree_of_ne u₂ ⟨pk, slRootDet pr pk u₁⟩ msg (toEagerSig pr sig) _ hfp2]
+          rw [verifyAndExtractTable_snd_of_forsPk_ne pr pk pkSl _ u₁ hvt1.2.2 msg sig _ hfp,
+              verifyAndExtractTable_snd_of_forsPk_ne pr pk pkSl _ u₂ hvt2.2.2 msg sig _ hfp2]
           simp [Option.map_eq_some_iff]
       simp only [EvForsPre, EvItsr, hpk, hff_iff]
-    unfold candForsPre
+    rw [candForsPre_eq_spec, candForsPre_eq_spec]
     by_cases h1 : EvForsPre pr pk u₁ (some (msg, sig)) st
     · have h2 : EvForsPre pr pk u₂ (some (msg, sig)) st := hev_iff.1 h1
       simp only [h1, h2, ↓reduceIte, ← hpk]
       obtain ⟨_, _, i, val, _, hw1, _, _, _, _, _, _⟩ := candForsPre_sound pr pk u₁ (some (msg, sig)) st h1
       have hw2 : extractedWitness pr pk u₂ (some (msg, sig)) st = some (.fors (.fPreimage i val)) := by
         unfold extractedWitness at hw1 ⊢; dsimp only at hw1 ⊢
-        rw [← hpk]
+        rw [hvt1_pk] at hw1
+        rw [hvt2_pk, ← hpk]
         set pkSl := slRootDet pr pk u₁
-        set target := chosenForsTree pr pk pkSl st.itLog msg sig
-        set parts := schemeParts vp.sl (prEager pr) msg (toEagerSig pr sig) ⟨pk, pkSl⟩
+        set parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk pkSl msg)
         by_cases hfp : forsPkFromSig (prEager pr) (toEagerSig pr sig).fors parts.md.toList pk parts.forsAdrs =
             forsPkGen (prEager pr) u₁ pk parts.forsAdrs
         · have hfp2 := hfp.trans (hfors_pk parts.forsAdrs)
-          simp only [hfp, ↓reduceIte] at hw1
-          simp only [hfp2, ↓reduceIte, ← hfind_fors]
+          rw [verifyAndExtractTable_snd_of_forsPk_eq pr pk pkSl _ u₁ hvt1.2.2 msg sig _ hfp] at hw1
+          rw [verifyAndExtractTable_snd_of_forsPk_eq pr pk pkSl _ u₂ hvt2.2.2 msg sig _ hfp2]
+          dsimp only at hw1 ⊢
+          rw [← hfind_fors]
           exact hw1
-        · simp only [hfp, ↓reduceIte] at hw1
-          rw [findWitness_eq_hypertree_of_ne u₁ ⟨pk, pkSl⟩ msg (toEagerSig pr sig) target hfp,
-              Option.map_eq_some_iff] at hw1
+        · rw [verifyAndExtractTable_snd_of_forsPk_ne pr pk pkSl _ u₁ hvt1.2.2 msg sig _ hfp,
+            Option.map_eq_some_iff] at hw1
           obtain ⟨_, _, hc⟩ := hw1; cases hc
       rw [hw1, hw2]
     · have h2 : ¬ EvForsPre pr pk u₂ (some (msg, sig)) st := fun h => h1 (hev_iff.2 h)
@@ -2799,7 +2881,7 @@ theorem pr_EvForsPreEqSP_le_Ne {D E : Type} {qs : ℕ}
       ∃ c : ForsLeafCoord vp, HitC c z := by
     rintro ⟨pk, u, out, st⟩ ⟨aLeaf, val, hcand⟩
     have hev : EvForsPre pr pk u out st := by
-      by_contra hnot; simp [candForsPre, hnot] at hcand
+      by_contra hnot; rw [candForsPre_eq_spec, ite_eq_right hnot] at hcand; cases hcand
     obtain ⟨msg, sig, i, val', rfl, _, hcand', _, _, _, _, _⟩ := candForsPre_sound pr pk u out st hev
     rw [hcand] at hcand'; obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj hcand')
     set parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk (slRootDet pr pk u) msg)
@@ -2852,7 +2934,7 @@ theorem pr_EvForsPreEqSP_le_Ne {D E : Type} {qs : ℕ}
       ∀ e ∈ st.itLog, queryOpensCoord pr pk (slRootDet pr pk u) c e.2.2.2 e.1 = false := by
     intro pk u out st hinv ⟨val, hcand⟩ e he
     have hev : EvForsPre pr pk u out st := by
-      by_contra hnot; simp [candForsPre, hnot] at hcand
+      by_contra hnot; rw [candForsPre_eq_spec, ite_eq_right hnot] at hcand; cases hcand
     obtain ⟨msg, sig, i, val', rfl, _, hcand', _, _, _, _, hi_eq⟩ := candForsPre_sound pr pk u out st hev
     rw [hcand] at hcand'; obtain ⟨hleaf_eq, _⟩ := Prod.mk.inj (Option.some.inj hcand')
     set parts := splitDigest vp.sl.params (pr.HmsgSl sig.randomness pk (slRootDet pr pk u) msg)
@@ -3131,12 +3213,21 @@ theorem pr_EvForsPre_le {D E : Type} {qs : ℕ}
       · exact Or.inl (Or.inr ⟨aLeaf, val, x, hcand, hhi, hveq, hsp⟩)
       · exact Or.inl (Or.inl ⟨aLeaf, val, x, hcand, hhi, hveq⟩)
     · exact Or.inr ⟨aLeaf, val, x, hcand, hhi, hsp⟩
-  have ⟨hdspr_succ, hdspr_sp⟩ := dspr_B_dsprF_fors_eq pr sfStage adv
+  obtain ⟨c, hc_top, hdspr_succ, hdspr_sp⟩ := dspr_B_dsprF_fors_eq pr sfStage adv
   have hdspr_le : Pr{let z ← postPrfExp pr sfStage adv}[EvForsPreNoSP pr z.1 z.2.1 z.2.2.1 z.2.2.2] ≤
       Pr{let z ← postPrfExp pr sfStage adv}[EvForsPreEqSP pr z.1 z.2.1 z.2.2.1 z.2.2.2] +
         SM_DT_DSPR_Advantage (B_dsprF_fors pr sfStage adv) := by
     rw [SM_DT_DSPR_Advantage, hdspr_succ, hdspr_sp]
-    exact le_add_tsub
+    exact (ENNReal.add_le_add_iff_right hc_top).1 (by
+      calc Pr{let z ← postPrfExp pr sfStage adv}[EvForsPreNoSP pr z.1 z.2.1 z.2.2.1 z.2.2.2] + c
+          ≤ (Pr{let z ← postPrfExp pr sfStage adv}[EvForsPreEqSP pr z.1 z.2.1 z.2.2.1 z.2.2.2] + c) +
+              ((Pr{let z ← postPrfExp pr sfStage adv}[EvForsPreNoSP pr z.1 z.2.1 z.2.2.1 z.2.2.2] + c) -
+                (Pr{let z ← postPrfExp pr sfStage adv}[EvForsPreEqSP pr z.1 z.2.1 z.2.2.1 z.2.2.2] + c)) :=
+            le_add_tsub
+        _ = (Pr{let z ← postPrfExp pr sfStage adv}[EvForsPreEqSP pr z.1 z.2.1 z.2.2.1 z.2.2.2] +
+              ((Pr{let z ← postPrfExp pr sfStage adv}[EvForsPreNoSP pr z.1 z.2.1 z.2.2.1 z.2.2.2] + c) -
+                (Pr{let z ← postPrfExp pr sfStage adv}[EvForsPreEqSP pr z.1 z.2.1 z.2.2.1 z.2.2.2] + c))) + c := by
+            ac_rfl)
   have hsym := pr_EvForsPreEqSP_le_Ne pr sfStage adv
   have htcr := pr_EvForsPreNe_le pr sfStage adv
   set pNe := Pr{let z ← postPrfExp pr sfStage adv}[EvForsPreNe pr z.1 z.2.1 z.2.2.1 z.2.2.2]
