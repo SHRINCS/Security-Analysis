@@ -19,15 +19,15 @@ public import ShrincsSecurity.Undetectability.Rest.ReproHalf
   quantum queries issued before the `j`-th call to `Reprogram`, for `e ∈ {1, 1/2}`,
   `|Pr[Repro₀(A) ⇒ 1]^e − Pr[Repro₁(A) ⇒ 1]^e| ≤ 4 √(∑_j q̂_j / |X₁|)`
   (`lemmaC3_one`, `lemmaC3_half`). Our Fourier-basis fidelity proof yields the sharper constant
-  `√2` for both `e = 1` and `e = 1/2` (`lemmaC3_sharp`, `lemmaC3_sqrt_sharp`), which implies
+  `√2` for both `e = 1` and `e = 1/2` (`lemmaC3_both_sharp`), which implies
   both Remark C.3's `2√2` and Lemma C.3's `4`.
 * **Lemma C.1** ([GHHM21], lines 5875–5881): for total query budget `q` (`∀ j, q̂_j ≤ q`),
   `|Pr[Repro₀(A) ⇒ 1] − Pr[Repro₁(A) ⇒ 1]| ≤ (3 R / 2) √(q / |X₁|)` (`lemmaC1`, since `√2 < 3/2`).
 * **Quantum Lemma C.5** (`DI-Repro → Repro`): `diReproProb_eq_reproProb_filterRun`, together with
   `diRepro_lemmaC3_one`, `diRepro_lemmaC3_half`, `diRepro_lemmaC1`.
-* **Unconditional Quantum Corollaries C.1 and C.3** (`corollaryC1`, `diRepro_corollaryC1`,
-  `diRepro_corollaryC3_one`, `diRepro_corollaryC3_half`, `diRepro_corollaryC3_min`): combining the
-  proved QROM Lemmas C.1 and C.3 with the arithmetic of `Undetectability.Rest.ReproHalf`.
+* **Unconditional Quantum Corollaries C.1 and C.3** (`corollaryC1`, `diRepro_corollaryC3`):
+  combining the proved QROM Lemmas C.1 and C.3 with the arithmetic of
+  `Undetectability.Rest.ReproHalf`.
 
 ## Proof overview
 

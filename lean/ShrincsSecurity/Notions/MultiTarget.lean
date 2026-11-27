@@ -27,8 +27,9 @@ definitional.
   are the instances with `th.seedGen = $ᵗ P` (`TweakableHash.UniformSeed`, and the constructor
   `TweakableHash.ofFun`).
 * **Index `j`.** The paper's `j ∈ [|Q|]` is 1-based; VCVio indexes the issue-ordered history from
-  `0` and an out-of-range index loses, which is the same as restricting the adversary to
-  `j ∈ [|Q|]`.
+  `0`. For success notions (`SM-TCR`, `SM-PRE`, `SM-rTCR`) an out-of-range index loses; for
+  `SM-DSPR` an out-of-range index returns `false` in both `Experiment` and `SPExperiment`,
+  contributing `0 − 0 = 0` to the net advantage (matching `[BHK+19]`'s `(0, true)` fallback).
 * **Refusals.** VCVio's challenge oracles return `Option`, `none` being the paper's `⊥`, with
   exactly the paper's refusal conditions (`|Q| ≥ p` or a repeated tweak), leaving the state
   untouched; the additional collection-clash refusal is vacuous at the empty collection.

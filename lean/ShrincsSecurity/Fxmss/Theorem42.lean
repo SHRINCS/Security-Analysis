@@ -155,7 +155,7 @@ omit [Fintype pr.Digest] in
 advantages of the `w − 2` hybrid reductions, the SM-UD term is at most `w · ε`. -/
 theorem theorem_4_2_of_ud_le (hP : P.Valid) (hinj : Function.Injective pr.yToBytes)
     (hgc : GrindComplete pr) {qs qh₁ qh₂ L : ℕ} (A : Forger pr Msg slKeygen qs qh₁ qh₂ L)
-    {ε : ℝ≥0∞} (hε : ∀ γ, SM_DT_UD_Advantage (B3 pr Msg slKeygen γ A) ≤ ε) :
+    {ε : ℝ≥0∞} (hε : ∀ γ < P.w - 2, SM_DT_UD_Advantage (B3 pr Msg slKeygen γ A) ≤ ε) :
     succ pr Msg slKeygen A.toFxmssAdversary ≤
       Generic.RandomSamplingTCR.advantage (fun _ => true) 1 (B0 pr Msg slKeygen A) +
       ENNReal.ofReal (Repro.diAdvantage (B1 pr Msg slKeygen A)) +
@@ -169,7 +169,8 @@ theorem theorem_4_2_of_ud_le (hP : P.Valid) (hinj : Function.Injective pr.yToByt
   refine (theorem_4_2 pr Msg slKeygen hP hinj hgc A).trans ?_
   gcongr
   calc ∑ γ ∈ Finset.range (P.w - 2), SM_DT_UD_Advantage (B3 pr Msg slKeygen γ A)
-      ≤ ∑ _γ ∈ Finset.range (P.w - 2), ε := Finset.sum_le_sum fun γ _ => hε γ
+      ≤ ∑ _γ ∈ Finset.range (P.w - 2), ε :=
+        Finset.sum_le_sum fun γ hγ => hε γ (Finset.mem_range.mp hγ)
     _ = ((P.w - 2 : ℕ) : ℝ≥0∞) * ε := by simp
     _ ≤ P.w * ε := by gcongr; exact_mod_cast Nat.sub_le _ _
 

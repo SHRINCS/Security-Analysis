@@ -19,11 +19,9 @@ model of `ShrincsSecurity.Scheme` (Algorithms 1–3), in the setting of Theorem 
   `Th_λ` (with `H_grind`), `PRF`, `PRF_msg` and `H_msg^sl`. This is the reading of Assumption 4.1
   used by the formalisation of Theorem 4.2 for `Th_λ`: the functions are distinct and independent
   of the random oracle by construction, the collection is attacked through standard-model
-  (collection) games, and the two PRFs through Definition 4.3. `H_msg^sl` is treated like `Th_λ`:
-  a public function, whose security enters only through the quoted stateless bound (Claim 4.16,
-  `StatelessBound`). The reductions evaluate it directly; time is not modelled (as for Theorem
-  4.2), so Lemma 4.2, which only removes these evaluations from the time accounting, has nothing
-  to discharge.
+  (collection) games, the two PRFs through Definition 4.3, and `H_msg^sl` through the
+  standard-model `ITSR` game (`Notions.itsrSucc`, discharged in `Claim416.lean` and
+  `Slhdsa/Theorem43.lean`). Time is not modelled by VCVio's `SM_DT_*` games (see `DEVIATIONS.md`).
 
 ## Messages
 
@@ -31,10 +29,10 @@ Definition 4.15 signs pairs `(ctx, M)`. The model fixes a **finite** message typ
 encoding `MsgEnc` into such pairs (contexts of at most 255 bytes, as Algorithm 2 requires). The
 random oracle needs a finite input space (`X₂` of Definition C.2), hence the finite type. The
 stateful path binds the **bound message** `M̃ = 0x00 ‖ toByte(|ctx|, 1) ‖ ctx ‖ PK.sl ‖ M`; its
-random-oracle input is the structured value `(PK.sl, m) : BMsg`, which determines `M̃` and is
-determined by it (`Scheme.Shrincs.boundMessage_injective`), and `PRF_msg^sf` receives the byte
-string `M̃` itself (`bmBytes`). The stateless path signs `PK.sf ‖ M` under `ctx` with SLH-DSA
-(FIPS 205 pure mode; `slMsg` is the encoded `M'`).
+random-oracle input is the structured value `(PK.sl, m) : BMsg`, which determines `M̃` and (under
+`enc.Injective`) is determined by it (`Scheme.Shrincs.boundMessage_injective`), and `PRF_msg^sf`
+receives the byte string `M̃` itself (`bmBytes`). The stateless path signs `PK.sf ‖ M` under `ctx`
+with SLH-DSA (FIPS 205 pure mode; `slMsg` is the encoded `M'`).
 
 ## The scheme (`scheme`)
 

@@ -10,7 +10,9 @@ public import ShrincsSecurity.Shrincs.AFBounds
 `Shrincs/Theorem41.lean`): in `GAME.5` (equivalently `GAME.4`, `gameHybS`, since the aborts of
 `GAME.3` and `GAME.5` concern only the stateful branch), the probability `Pr_{gameHybS}[W_sl]`
 that a SHRINCS forger `A` outputs a fresh forgery verifying on the stateless branch is bounded by
-the exact **ten post-PRF summands** of Main Paper Theorem 4.3 (`[HK22]`):
+the **ten post-PRF summands** of `Slhdsa.postPrf_bound` (see `DEVIATIONS.md` §4.6 for the minor
+`4 · SM-TCR(F) + 2 · SM-TCR(H)` vs. paper `5 · SM-TCR(F) + 1 · SM-TCR(H)` difference and the
+aggregate `q_s` vs. `q_s^{sl}` ITSR budget):
 
 1. `Succ^{ITSR}_{H_msg^sl, q_s}(B_itsr)`
 2. `+ ∑_{γ < w - 2} Adv^{SM-UD}_{F ∈ Th_λ, q₂}(B_ud γ)`
@@ -1491,8 +1493,8 @@ theorem pr_gameHybS_Wsl_le_postPrf (henc : enc.Injective)
 omit [Fintype pr.PkSeed] [Fintype pr.Digest] [DecidableEq pr.Digest] [Fintype Msg] in
 /-- **Main Paper Claim 4.16 (unconditional discharge of `StatelessBound`)**:
 under `hinj : Function.Injective pr.yToBytes` and `henc : enc.Injective`, the stateless-branch
-forgery probability `Pr_{gameHybS}[W_sl]` in `GAME.5` is bounded by the exact ten post-PRF
-summands of Main Paper Theorem 4.3 (`[HK22]`) for the Stage-1-precomputing reductions built from
+forgery probability `Pr_{gameHybS}[W_sl]` in `GAME.5` is bounded by the ten post-PRF summands of
+`Slhdsa.postPrf_bound` for the Stage-1-precomputing reductions built from
 `(sfStageShrincs, shrincsSlAdv)`. -/
 theorem claim_4_16 (hinj : Function.Injective pr.yToBytes) (henc : enc.Injective)
     {qs : ℕ} (A : Notions.ShrincsAdversary (scheme pr Msg enc) qs) :

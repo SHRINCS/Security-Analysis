@@ -338,11 +338,29 @@ Departures:
     `isStateful_of_mem_shrincsX_Omega` for `B8S`'s exclusion partition): every stateful query has a
     stateful tweak and every stateless query has a stateless tweak, so neither path's Stage-1
     collection queries interfere with the other path's challenge tweaks.
-  - **Remaining scope:** as in §4.5, running time is not modelled, VCVio's collection games carry
-    no `IsQueryBoundP` budgets on collection queries, and in Claim 4.15 stateful signing / `PK.sf`
-    still runs in Stage 2 (`stageHyb`). Thus the reductions mirror Claims 4.15–4.16's Stage-1
-    simulation structure, but do **not** formalise concrete time accounting
-    (`ξ̃_sf ≤ ξ + V_sf`, `ξ̃_sl ≤ ξ + V_sl`). `B₀(A_F)` and `B₁⁺` attack `H_msg^sf` (not `Th_λ`).
+- **Remaining scope & audit notes on the stateless route (`PostPrf.lean`, `Claim416.lean`,
+  `Theorem43.lean`):**
+  - **Post-PRF summand split (`4 · SM-TCR(F) + 2 · SM-TCR(H)` vs. paper `5 · SM-TCR(F) + 1 · SM-TCR(H)`).
+    Route.** Paper Theorem 4.3 / Claim 4.16 (and `Concrete/Paths.lean`'s `slColl`) list five
+    `SM-TCR(F)` terms (WOTS `F`, an extra FORS-leaf `F` from `[HK22]`, and `3 ·` FORS-leaf `F`)
+    and one combined XMSS+FORS `SM-TCR(H)` term. Lean's `Slhdsa.postPrf_bound` omits the redundant
+    FORS-leaf `SM-TCR(F)` hop and keeps XMSS `H` (`B_tcrH_xmss`) and FORS `H` (`B_tcrH_fors`) as
+    two separate `SM-TCR(H)` terms. Under `SlCharge.uniform` the concrete total coincides, while
+    under `SlCharge.perFunction` (footnote 15) `Concrete/Paths.lean` evaluates the paper's multiset.
+  - **ITSR query cap in Claim 4.16 (`q_s` vs. `q_s^{sl}`). Choice.** Because
+    `Notions.ShrincsAdversary` tracks a single aggregate signing cap `qs = q_s^{sf} + q_s^{sl}`,
+    `B_itsr` in `claim_4_16` / `theorem_4_1_full` is typed with cap `qs` (even though only
+    stateless queries are forwarded to ITSR).
+  - **Stage-2 extraction & time/budget scope.** As in §4.5, running time is not modelled, VCVio's
+    collection games carry no `IsQueryBoundP` budgets on collection queries, and in Claim 4.15
+    stateful signing / `PK.sf` still runs in Stage 2 (`stageHyb`). In `PostPrf.lean`, Stage-2
+    signing (`slSignTable`) makes zero `Th_λ` evaluations, and `B_ud`/`B_pre` extract directly from
+    `HybTree`, while the 7 TCR/DSPR extractors (`routedTcrAdv`, `B_dsprF_fors`) currently call
+    `extractedWitness` rather than reading `vt.2` directly (scheduled for table-driven extraction
+    and explicit `Th_λ` complexity tracking). In `B_dsprF_fors`, non-winning runs output an
+    out-of-range index `savedQ.length`, which returns `false` in both `SM_DT_DSPR_Experiment` and
+    `SM_DT_DSPR_SPExperiment` (net advantage identical to `[BHK+19]`'s `(0, true)` fallback).
+    `B₀(A_F)` and `B₁⁺` attack `H_msg^sf` (not `Th_λ`).
 - **Hedged mode and message encoding (`enc.Injective`). Forced (proof) for Claim 4.16; automatic in
   the document's model.**
   - `Shrincs/Model.lean` proves algorithm-by-algorithm correspondence with `Scheme.Shrincs`
@@ -425,9 +443,9 @@ Quantum: Table 5, Claims 6.1–6.4, Remark 6.1, the abstract's `2^58.0–2^59.2`
     `Concrete.Vsl_bounds_slVerify`), and total public-hash queries bounded by `1 + Vsl = 2742`
     (`verifyInternalM_isTotalQueryBound_smax`).
 - **Scope.** The `Concrete/` files evaluate the document's sums of Table 6/7 generic bounds; they
-  do **not** link the composite Theorem 4.1–4.3 sums to `Shrincs.theorem_4_1` or
-  `Fxmss.Rom.theorem_4_2`. Individual Table 6/7 row bridges exist only for the proved generic
-  bounds:
+  do **not** link the composite Theorem 4.1–4.3 sums to `Shrincs.theorem_4_1_full`,
+  `Fxmss.Rom.theorem_4_2`, or `Slhdsa.theorem_4_3`. Individual Table 6/7 row bridges exist only for
+  the proved generic bounds:
   - Classical (`Concrete/Generic.lean`): Corollary G.1 (`smRtcrBound_corollaryG1`), Corollary C.2
     (`diReproBound_corollaryC2`), Theorem E.1 (`smTcrExclBound_theoremE1`), ITSR Theorem 2
     (`itsrBound_theorem2`), and classical Theorem F.2 (`itsrBoundF2_theoremF2`).
@@ -500,12 +518,15 @@ Quantum: Table 5, Claims 6.1–6.4, Remark 6.1, the abstract's `2^58.0–2^59.2`
     - **M Lemma C.1** (`lemmaC1`, constant `3R/2`, since `√2 < 3/2` and `√R ≤ R`),
     - **Quantum Lemma C.5** (`diReproProb_eq_reproProb_filterRun` via `filterRun`), and
     - **Unconditional Quantum Corollaries C.1 and C.3** (`corollaryC1`, `diRepro_corollaryC3`).
-  - **Model scope:** `ReproProg` / `DIReproProg` models multi-stage unitary circuits with fixed
-    per-stage query counts `q : Fin (R + 1) → ℕ`, classical readout `callX2` after each stage, and
-    a projective final measurement (rather than general adaptive `QuantumComp` programs with
-    random query schedules `q̂_j`). The real-number algebraic helpers in `ReproHalf.lean` remain
-    reusable over abstract reals `p₀, p₁ : ℝ`. No quantum lifting of the SHRINCS/FXMSS reductions
-    `B₁`/`B₁⁺` is formalised (Theorems 4.1 and 4.2 remain classical).
+  - **Model scope:** `ReproProg` / `DIReproProg` models multi-stage pure-state unitary circuits
+    with fixed per-stage query counts `q : Fin (R + 1) → ℕ`, unconditional classical readout
+    `callX2` after each stage (in `DIReproProg`, skipping reprogramming only via duplicate `x₂` in
+    `filterRun`), and a projective final measurement (rather than general adaptive `QuantumComp`
+    programs with random query schedules `q̂_j`; purifying mixed states and intermediate
+    measurements into workspace `E` is standard in prose, not formalised as a Lean equivalence).
+    The real-number algebraic helpers in `ReproHalf.lean` remain reusable over abstract reals
+    `p₀, p₁ : ℝ`. No quantum lifting of the SHRINCS/FXMSS reductions `B₁`/`B₁⁺` is formalised
+    (Theorems 4.1 and 4.2 remain classical).
 - **U Lemma 3 (Markov brothers). Scope.** Only the endpoint form `|P′(±1)| ≤ d²` is proved
   (`abs_derivative_eval_one_le`), from Mathlib's Chebyshev extremality. That is the only use in U
   (p. 9, proof of Lemma 7: "t = −1 gives…"). The full interior inequality is not in Mathlib.

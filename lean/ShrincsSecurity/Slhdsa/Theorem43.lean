@@ -29,10 +29,18 @@ Succ^{EU-CMA}_{SLH-DSA, q_s}(A)
 ```
 
 where `q₁ = slSecretCount vp.sl = wotsInstanceCount · len + 2^h · k · 2^a` is the exact number of
-secret-key elements of the hypertree, `q₂ = wotsInstanceCount · len`, `q₃ = q₂ · (w - 2)`,
-`q₄ = 2^h · (2^{h'} - 1) / ...` (exact VCVio target counts of `PostPrf.lean`), and the bound holds
-in the standard model for `Th_λ` and `H_msg^sl` (`ITSR`) under `hinj : Function.Injective pr.yToBytes`
-and `henc : enc.Injective`.
+secret-key elements of the hypertree, `q₂ = wotsInstanceCount · len`, `q₃ = q₂ · (w - 1)`,
+`q₄ = xmssTreeCount · (2^{h'} - 1)` (with `q₅ = 2^h`, `q₆ = wotsInstanceCount`,
+`q₇ = 2^h · k · (2^a - 1)`, `q₈ = 2^h · k · 2^a`, exact VCVio reachable-target counts of
+`PostPrf.lean`), and the bound holds in the standard model for `Th_λ` and `H_msg^sl` (`ITSR`) under
+`hinj : Function.Injective pr.yToBytes` and `henc : enc.Injective`.
+
+**Note on the 10 post-PRF summands vs. the paper's restatement of `[HK22]`:** The paper's Theorem 4.3
+lists `5 · SM-TCR(F) + 1 · SM-TCR(H)` (including an extra FORS-leaf `SM-TCR(F)` hop from `[HK22]`
+and a single combined XMSS+FORS `SM-TCR(H)` term), whereas `postPrf_bound` proves the cleaner
+`4 · SM-TCR(F) + 2 · SM-TCR(H)` form (`B_tcrF_wots` + `3 · B_tcrF_fors`, omitting the redundant
+FORS-leaf `F` hop, and keeping XMSS `H` and FORS `H` as separate `SM-TCR(H)` terms `B_tcrH_xmss`
+and `B_tcrH_fors`; see `DEVIATIONS.md` §4.6).
 
 ## Proof architecture
 

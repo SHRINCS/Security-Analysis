@@ -40,14 +40,20 @@ most the ten post-PRF summands of Theorem 4.3.
 
 ## Statement
 
-`theorem_4_1`: for every forger `A` (Definition 4.15; `q_s` signing queries, `q_{h,1} + q_{h,2}`
-queries to `H_msg^sf`, structures with at most `L` anchors) with `StatelessBound A ε_sl`,
+`theorem_4_1_full`: for every forger `A` (Definition 4.15; `q_s` signing queries, `q_{h,1} + q_{h,2}`
+queries to `H_msg^sf`, structures with at most `L` anchors), under `hinj`, `henc`, and `hgc`:
 
 `Succ^{SHRINCS-EU-CMA}(A) ≤ Adv^{prf}_{PRF, q₁}(B_prf) + Adv^{prf}_{PRF_msg, q_s}(B_prfmsg)
   + Adv^{SM-rTCR,1}(B₀(A_F)) + Adv^{DI-Repro}(B₁⁺)
   + Succ^{S-TCR(Prop)}(B₂⁺) + Σ_{γ < w−2} Adv^{sm-ud}(B₃,γ⁺) + Succ^{sm-tcr}(B₄⁺)
   + Succ^{sm-pre}(B₅⁺) + Succ^{sm-tcr}(B₆⁺) + Succ^{sm-tcr}(B₇⁺)
-  + Succ^{sm-tcr-excl}(B₈⁺) + ε_sl`.
+  + Succ^{sm-tcr-excl}(B₈⁺)
+  + Succ^{ITSR}_{H_msg^sl, q_s}(B_itsr) + Σ_{γ < w−2} Adv^{sm-ud}(B_ud γ)
+  + Succ^{sm-pre}(B_pre) + Succ^{sm-tcr}(B_tcrF_wots) + Succ^{sm-tcr}(B_tcrH_xmss)
+  + Succ^{sm-tcr}(B_tcrThK) + Succ^{sm-tcr}(B_tcrThLsl) + Succ^{sm-tcr}(B_tcrH_fors)
+  + 3 · Succ^{sm-tcr}(B_tcrF_fors) + Adv^{sm-dspr}(B_dsprF_fors)`.
+
+(`theorem_4_1` is the backwards-compatible alias accepting an abstract `StatelessBound A ε_sl`.)
 
 `A_F` (`AF`) is the FXMSS forger that runs `A` and simulates the stateless path with uniform
 secrets and randomizers; `B₀(A_F)` is the augmented `B₀`, `B₁⁺` (`B1S`) is the augmented `B₁`

@@ -1,0 +1,94 @@
+name: Lean 4 Verification
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: lean-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Build, Axiom & Hygiene Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install elan & Lean toolchain
+        run: |
+          curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/elan" toolchain install "$(cat lean/lean-toolchain)"
+
+      - name: Cache Lake packages and build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            lean/.lake/packages
+            lean/.lake/build
+          key: lean-${{ runner.os }}-${{ hashFiles('lean/lean-toolchain', 'lean/lake-manifest.json') }}-${{ hashFiles('lean/ShrincsSecurity/**/*.lean') }}
+          restore-keys: |
+            lean-${{ runner.os }}-${{ hashFiles('lean/lean-toolchain', 'lean/lake-manifest.json') }}-
+
+      - name: Fetch Mathlib cache
+        working-directory: lean
+        run: lake exe cache get
+
+      - name: Full Lake build (strict 0 errors, 0 warnings)
+        working-directory: lean
+        run: |
+          set -o pipefail
+          lake build 2>&1 | tee /tmp/lake-build.log
+          if grep -q "warning:" /tmp/lake-build.log; then
+            echo "::error::Build emitted compiler or linter warnings."
+            grep -n -C 2 "warning:" /tmp/lake-build.log
+            exit 1
+          fi
+
+      - name: Check forbidden tokens (zero sorry/axiom/admit/unsafe/native_decide/extern)
+        run: |
+          if grep -rnE '\b(sorry|admit|axiom|unsafe|implemented_by|native_decide)\b|@\[extern' lean/ShrincsSecurity/; then
+            echo "::error::Forbidden escape-hatch token detected."
+            exit 1
+          fi
+          echo "CLEAN: zero forbidden tokens."
+
+      - name: Verify axioms of headline theorems
+        working-directory: lean
+        run: |
+          set -euo pipefail
+          lake env lean --stdin <<'EOF' | tee /tmp/axioms.log
+          import ShrincsSecurity
+          #print axioms ShrincsSecurity.ITSR.advantage_le_mainBound
+          #print axioms ShrincsSecurity.Scheme.Shrincs.verify_sign
+          #print axioms ShrincsSecurity.Scheme.Grinding.epsGc_shrincs_lt
+          #print axioms ShrincsSecurity.Concrete.Vsf_bounds_fxmssVerify
+          #print axioms ShrincsSecurity.Concrete.Vsl_bounds_slVerify
+          #print axioms ShrincsSecurity.Fxmss.Rom.theorem_4_2
+          #print axioms ShrincsSecurity.Fxmss.Rom.theorem_4_2_of_ud_le
+          #print axioms ShrincsSecurity.Fxmss.Rom.corollary_4_2
+          #print axioms ShrincsSecurity.Slhdsa.postPrf_bound
+          #print axioms ShrincsSecurity.Shrincs.claim_4_16
+          #print axioms ShrincsSecurity.Shrincs.theorem_4_1_full
+          #print axioms ShrincsSecurity.Shrincs.theorem_4_1_full_of_ud_le
+          #print axioms ShrincsSecurity.Shrincs.corollary_4_1_full
+          #print axioms ShrincsSecurity.Slhdsa.slhdsaScheme_perfectlyComplete
+          #print axioms ShrincsSecurity.Slhdsa.theorem_4_3
+          #print axioms ShrincsSecurity.Slhdsa.theorem_4_3_of_ud_le
+          #print axioms ShrincsSecurity.Undetectability.TwoStageAdversary.lemma10
+          #print axioms ShrincsSecurity.Undetectability.TwoStageAdversary.corollary12
+          #print axioms ShrincsSecurity.Undetectability.ReproQrom.lemmaC3_both_sharp
+          #print axioms ShrincsSecurity.Undetectability.ReproQrom.diRepro_corollaryC3
+          EOF
+          # Ensure no non-standard axioms (such as sorryAx) appear
+          if grep -E "depends on axioms:" /tmp/axioms.log | grep -vE '^.+ depends on axioms: \[(propext|Classical\.choice|Quot\.sound)(, (propext|Classical\.choice|Quot\.sound))*\]$'; then
+            echo "::error::Unexpected axiom detected!"
+            exit 1
+          fi
+          echo "ALL HEADLINE THEOREMS DEPEND ONLY ON STANDARD AXIOMS."
